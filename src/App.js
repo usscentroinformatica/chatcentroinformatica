@@ -10,9 +10,8 @@ function App() {
   const [darkMode, setDarkMode] = useState(false);
   const messagesEndRef = useRef(null);
 
-  const API_URL = process.env.NODE_ENV === 'production' 
-  ? '/api/chat' 
-  : 'http://localhost:5000/api/chat';
+  // Usar la ruta relativa para Vercel (siempre /api/chat en producción)
+  const API_URL = '/api/chat';
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
