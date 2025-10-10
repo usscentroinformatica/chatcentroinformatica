@@ -10,8 +10,9 @@ function App() {
   const [darkMode, setDarkMode] = useState(false);
   const messagesEndRef = useRef(null);
 
-  // Usar la ruta relativa para Vercel (siempre /api/chat en producción)
-  const API_URL = '/api/chat';
+  const API_URL = process.env.NODE_ENV === 'production' 
+    ? '/api/chat' 
+    : 'http://localhost:5000/api/chat';
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -105,10 +106,8 @@ function App() {
   };
 
   return (
-    <div className={`flex flex-col h-screen max-w-4xl mx-auto transition-colors duration-300 ${
-      darkMode 
-        ? 'bg-gradient-to-br from-gray-900 to-gray-800' 
-        : 'bg-gradient-to-br from-blue-50 to-indigo-50'
+    <div className={`flex flex-col h-screen max-w-4xl mx-auto ${
+      darkMode ? 'bg-gradient-to-br from-gray-900 to-gray-800' : 'bg-gradient-to-br from-blue-50 to-indigo-50'
     }`}>
       {/* Header */}
       <div className={`p-6 shadow-lg transition-colors duration-300 ${
