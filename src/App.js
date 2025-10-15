@@ -259,7 +259,7 @@ function App() {
   }
 
   return (
-    <div className={`flex flex-col h-screen max-w-4xl mx-auto transition-colors duration-300 relative ${
+    <div className={`min-h-screen transition-colors duration-300 ${
       darkMode 
         ? 'bg-gradient-to-br from-gray-900 to-gray-800' 
         : 'bg-gradient-to-br from-green-700 via-green-600 to-green-800'
@@ -279,11 +279,18 @@ function App() {
           </div>
         </>
       )}
+      
+      {/* Contenedor del chat con fondo blanco */}
+      <div className={`flex flex-col h-screen max-w-4xl mx-auto relative z-10 ${
+        darkMode 
+          ? 'bg-gray-800 shadow-2xl' 
+          : 'bg-white shadow-2xl'
+      } md:my-4 md:rounded-2xl md:h-[calc(100vh-2rem)] overflow-hidden`}>
       {/* Header */}
-      <div className={`shadow-sm border-b p-4 transition-colors duration-300 backdrop-blur-md relative z-10 ${
+      <div className={`shadow-sm border-b p-4 transition-colors duration-300 ${
         darkMode 
           ? 'bg-gray-800 border-gray-700' 
-          : 'bg-white/90 border-white/30'
+          : 'bg-white border-gray-200'
       }`}>
         {/* Mobile status bar */}
         <div className="flex md:hidden items-center justify-between mb-4">
@@ -346,10 +353,10 @@ function App() {
       )}
 
       {/* Messages Area */}
-      <div className={`flex-1 overflow-y-auto p-4 space-y-4 md:p-6 transition-colors duration-300 relative ${
+      <div className={`flex-1 overflow-y-auto p-4 space-y-4 md:p-6 transition-colors duration-300 ${
         darkMode 
           ? 'bg-gray-800' 
-          : 'bg-white/10 backdrop-blur-sm'
+          : 'bg-gray-50'
       }`}>
         {messages.map((message, index) => (
           <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -422,10 +429,10 @@ function App() {
         </div>
 
       {/* Input Area */}
-      <div className={`border-t p-4 md:p-6 transition-colors duration-300 backdrop-blur-md relative z-10 ${
+      <div className={`border-t p-4 md:p-6 transition-colors duration-300 ${
         darkMode 
           ? 'bg-gray-800 border-gray-700' 
-          : 'bg-white/90 border-white/30'
+          : 'bg-white border-gray-200'
       }`}>
         <div className="flex items-end gap-3 max-w-4xl mx-auto">
           <div className="flex-1">
@@ -488,6 +495,7 @@ function App() {
         </div>
       </div>
     </div>
+  </div>
   );
 }
 
