@@ -1,5 +1,7 @@
 // Serverless API para Vercel - Centro de Informática USS
-// Versión simplificada sin dependencias complejas
+// Versión completa con Google Sheets real
+
+const { google } = require('googleapis');
 
 // Almacenamiento en memoria para sesiones (limitado en serverless)
 const studentSessions = new Map();
@@ -110,27 +112,77 @@ function isDataComplete(data) {
   return true;
 }
 
-// Función simulada para guardar datos (por ahora solo log)
+// Función REAL para guardar en Google Sheets
 async function saveStudentData(studentData) {
   try {
-    console.log('🔄 Simulando guardado de datos:', studentData.nombre);
+    console.log('🔄 Guardando REAL en Google Sheets:', studentData.nombre);
     
+    // Verificar variables de entorno
+    if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY || !process.env.GOOGLE_SHEET_ID) {
+      console.log('⚠️ Variables de Google Sheets no configuradas en Vercel');
+      return { success: false, error: 'Variables de entorno faltantes' };
+    }
+
+    console.log('🔑 Configurando autenticación Google Sheets...');
+    
+    // Configurar autenticación con Service Account
+    const auth = new google.auth.GoogleAuth({
+      credentials: {
+        type: "service_account",
+        project_id: process.env.GOOGLE_PROJECT_ID || "chatbot-uss",
+        private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
+        private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        client_id: process.env.GOOGLE_CLIENT_ID,
+        auth_uri: "https://accounts.google.com/o/oauth2/auth",
+        token_uri: "https://oauth2.googleapis.com/token",
+        auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs"
+      },
+      scopes: ['https://www.googleapis.com/auth/spreadsheets']
+    });
+
+    const sheets = google.sheets({ version: 'v4', auth });
+    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+
+    console.log('📊 Preparando datos para insertar...');
+
+    // Preparar datos para insertar
     const timestamp = new Date().toLocaleString('es-PE');
-    const dataToSave = {
+    const rowData = [
       timestamp,
-      nombre: studentData.nombre,
-      ciclo: studentData.ciclo,
-      ultimoCurso: studentData.ultimoCurso,
-      correo: studentData.correo,
-      estado: 'Datos_Recopilados'
+      studentData.nombre || 'No proporcionado',
+      studentData.ciclo || 'No proporcionado',
+      studentData.ultimoCurso || 'No proporcionado',
+      'Por determinar', // Curso que corresponde
+      studentData.correo || 'No proporcionado',
+      'Datos_Recopilados'
+    ];
+
+    console.log('📝 Datos preparados:', rowData);
+    console.log('📍 Enviando a spreadsheet:', spreadsheetId);
+
+    // Insertar datos en Google Sheets
+    const response = await sheets.spreadsheets.values.append({
+      spreadsheetId,
+      range: 'Estudiantes!A:G',
+      valueInputOption: 'RAW',
+      resource: {
+        values: [rowData]
+      }
+    });
+
+    console.log('✅ Respuesta de Google Sheets:', response.data);
+    console.log('✅ Datos guardados REALMENTE para:', studentData.nombre);
+    
+    return { 
+      success: true, 
+      data: response.data,
+      studentName: studentData.nombre 
     };
 
-    console.log('📝 Datos que se guardarían:', dataToSave);
-    console.log('✅ Datos "guardados" exitosamente para:', studentData.nombre);
-    
-    return { success: true, data: dataToSave };
   } catch (error) {
-    console.error('❌ Error simulando guardado:', error.message);
+    console.error('❌ Error REAL guardando en Google Sheets:', error.message);
+    console.error('🔍 Error completo:', error);
     return { success: false, error: error.message };
   }
 }
@@ -182,12 +234,12 @@ module.exports = async (req, res) => {
     if (dataComplete) {
       console.log('🎯 DATOS COMPLETOS DETECTADOS - GUARDANDO...');
       
-      // Guardar datos (simulado por ahora)
+      // Guardar datos REALES en Google Sheets
       const saveResult = await saveStudentData(sessionData);
       if (saveResult.success) {
-        console.log('✅ Datos procesados exitosamente');
+        console.log('✅ Datos guardados EXITOSAMENTE en Google Sheets para:', saveResult.studentName);
       } else {
-        console.log('⚠️ Error al procesar datos:', saveResult.error);
+        console.log('⚠️ Error al guardar en Google Sheets:', saveResult.error);
       }
     }
 
