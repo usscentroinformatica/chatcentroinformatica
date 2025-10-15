@@ -1,7 +1,9 @@
-// Serverless function para Vercel - Versión completa con Google Sheets
-// Incluye toda la funcionalidad: extracción de datos, validación y guardado automático
+// Serverless API para Vercel - Centro de Informática USS
+// Versión completa con extracción de datos, Google Sheets y validación
 
-// Almacenamiento en memoria para sesiones (en serverless se resetea)
+const { google } = require('googleapis');
+
+// Almacenamiento en memoria para sesiones (limitado en serverless)
 const studentSessions = new Map();
 
 // Función para extraer datos del estudiante del mensaje
@@ -82,31 +84,52 @@ function extractStudentData(message) {
 
 // Función para verificar si los datos están completos
 function isDataComplete(data) {
+  console.log('🔍 VERIFICANDO SI DATOS ESTÁN COMPLETOS...');
   const completeness = {
     nombre: !!data.nombre,
     ciclo: !!data.ciclo,
     ultimoCurso: !!data.ultimoCurso,
-    correo: !!data.correo
+    correo: !!data.correo,
+    formatoIncorrecto: data.formatoIncorrecto
   };
+  
+  console.log('🔍 Evaluando completitud de datos:', completeness);
   
   const hasIncorrectFormat = data.formatoIncorrecto && data.formatoIncorrecto.length > 0;
   const missingFields = !completeness.nombre || !completeness.ciclo || !completeness.ultimoCurso || !completeness.correo;
   
-  return !hasIncorrectFormat && !missingFields;
+  if (hasIncorrectFormat) {
+    console.log('❌ Datos con formato incorrecto');
+    return false;
+  }
+  
+  if (missingFields) {
+    console.log('❌ Faltan campos requeridos');
+    return false;
+  }
+  
+  console.log('✅ TODOS LOS DATOS ESTÁN COMPLETOS - LISTO PARA GUARDAR!');
+  return true;
 }
 
-// Función para guardar en Google Sheets (usando Google Sheets API)
+// Función para guardar en Google Sheets
 async function saveToGoogleSheets(studentData) {
   try {
-    // Configuración de Google Sheets con Service Account
-    const { google } = require('googleapis');
+    console.log('🔄 Intentando guardar en Google Sheets:', studentData.nombre);
     
+    // Verificar variables de entorno
+    if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY || !process.env.GOOGLE_SHEET_ID) {
+      console.log('⚠️ Variables de Google Sheets no configuradas');
+      return { success: false, error: 'Variables de entorno faltantes' };
+    }
+    
+    // Configurar autenticación
     const auth = new google.auth.GoogleAuth({
       credentials: {
         type: "service_account",
         project_id: process.env.GOOGLE_PROJECT_ID || "chatbot-uss",
         private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
-        private_key: (process.env.GOOGLE_PRIVATE_KEY || "").replace(/\\n/g, '\n'),
+        private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
         client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
         client_id: process.env.GOOGLE_CLIENT_ID,
         auth_uri: "https://accounts.google.com/o/oauth2/auth",
@@ -119,11 +142,6 @@ async function saveToGoogleSheets(studentData) {
     const sheets = google.sheets({ version: 'v4', auth });
     const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
-    if (!spreadsheetId) {
-      console.log('⚠️ No se encontró GOOGLE_SHEET_ID');
-      return { success: false, error: 'No sheet ID configured' };
-    }
-
     // Preparar datos para insertar
     const timestamp = new Date().toLocaleString('es-PE');
     const rowData = [
@@ -131,10 +149,12 @@ async function saveToGoogleSheets(studentData) {
       studentData.nombre || 'No proporcionado',
       studentData.ciclo || 'No proporcionado', 
       studentData.ultimoCurso || 'No proporcionado',
-      'Por determinar',
+      'Por determinar', // Curso que corresponde
       studentData.correo || 'No proporcionado',
       'Datos_Recopilados'
     ];
+
+    console.log('📝 Datos preparados:', rowData);
 
     // Insertar datos
     const response = await sheets.spreadsheets.values.append({
@@ -146,8 +166,14 @@ async function saveToGoogleSheets(studentData) {
       }
     });
 
-    console.log('✅ Datos guardados en Google Sheets:', response.data);
-    return { success: true, data: response.data };
+    console.log('✅ Respuesta de Google Sheets:', response.data);
+    console.log('✅ Datos guardados en Google Sheets para:', studentData.nombre);
+    
+    return { 
+      success: true, 
+      data: response.data,
+      studentName: studentData.nombre
+    };
 
   } catch (error) {
     console.error('❌ Error guardando en Google Sheets:', error.message);
@@ -155,6 +181,7 @@ async function saveToGoogleSheets(studentData) {
   }
 }
 
+// Función principal del endpoint
 module.exports = async (req, res) => {
   // Configurar CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -170,7 +197,6 @@ module.exports = async (req, res) => {
   }
 
   try {
-    // Usar variables de entorno para las API keys
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyDB0hTWu-d3i5EIlzA34KwjEN4nQiq_SjE';
     
     const { message, sessionId } = req.body || {};
@@ -179,11 +205,12 @@ module.exports = async (req, res) => {
     }
 
     console.log('🆔 SessionId recibido:', sessionId);
+    console.log('💬 Mensaje recibido:', message);
 
     // Extraer datos del mensaje
     const extractedData = extractStudentData(message);
     
-    // Obtener datos previos de la sesión
+    // Obtener datos previos de la sesión (limitado en serverless)
     let sessionData = studentSessions.get(sessionId) || {};
     
     // Combinar datos previos con nuevos datos
@@ -199,28 +226,27 @@ module.exports = async (req, res) => {
     const dataComplete = isDataComplete(sessionData);
     
     if (dataComplete) {
-      console.log('🎯 DATOS COMPLETOS DETECTADOS - GUARDANDO...');
+      console.log('🎯 DATOS COMPLETOS DETECTADOS - GUARDANDO INMEDIATAMENTE...');
       
       // Guardar en Google Sheets
       const saveResult = await saveToGoogleSheets(sessionData);
       if (saveResult.success) {
-        console.log('✅ Datos guardados exitosamente en Google Sheets');
+        console.log('✅ Datos guardados exitosamente en Google Sheets para:', saveResult.studentName);
       } else {
         console.log('⚠️ Error al guardar en Google Sheets:', saveResult.error);
       }
     }
 
-    // Generar respuesta contextual según el estado de los datos
+    // Generar respuesta contextual
     let contextualPrompt = '';
     
     if (sessionData.formatoIncorrecto && sessionData.formatoIncorrecto.includes('ciclo_formato_incorrecto')) {
       contextualPrompt = `El usuario está proporcionando un formato incorrecto para el ciclo de egreso. 
-      
-CORRIGE AMABLEMENTE: "Necesito que me proporciones tu ciclo de egreso en el formato correcto: YYYY-N (ejemplo: 2022-1 o 2023-2). 
-Por favor escribe tu ciclo usando este formato: año de 4 dígitos, guión, y número del ciclo (1 o 2)."
+
+CORRIGE AMABLEMENTE: "Necesito que me proporciones tu ciclo de egreso en el formato correcto: YYYY-N (ejemplo: 2022-1 o 2023-2). Por favor escribe tu ciclo usando este formato: año de 4 dígitos, guión, y número del ciclo (1 o 2)."
 
 NO sigas con otras preguntas hasta que corrija el formato.`;
-    } else if (!isDataComplete(sessionData)) {
+    } else if (!dataComplete) {
       const missing = [];
       if (!sessionData.nombre) missing.push('nombre completo');
       if (!sessionData.ciclo) missing.push('ciclo de egreso (formato: YYYY-N, ej: 2022-1)');
@@ -228,22 +254,22 @@ NO sigas con otras preguntas hasta que corrija el formato.`;
       if (!sessionData.correo) missing.push('correo institucional USS (@uss.edu.pe o @crece.uss.edu.pe)');
       
       contextualPrompt = `Necesito los siguientes datos para procesar la inscripción: ${missing.join(', ')}.
-      
+
 FORMATO IMPORTANTE para ciclo: YYYY-N (ejemplo: 2022-1, 2023-2)
 FORMATO IMPORTANTE para correo: Debe terminar en @uss.edu.pe o @crece.uss.edu.pe
 
 Por favor proporciona estos datos en un solo mensaje, separados por comas.`;
     } else {
-      contextualPrompt = `✅ DATOS COMPLETOS RECIBIDOS:
+      contextualPrompt = `✅ DATOS COMPLETOS RECIBIDOS Y REGISTRADOS:
 - Nombre: ${sessionData.nombre}
 - Ciclo de egreso: ${sessionData.ciclo} 
 - Último curso: ${sessionData.ultimoCurso}
 - Correo: ${sessionData.correo}
 
-Los datos han sido registrados automáticamente. Ahora puedo ayudarte con cualquier consulta sobre el programa o proceso de inscripción.`;
+Los datos han sido registrados automáticamente en nuestro sistema. Te enviaremos los pasos para el pago a tu correo institucional. Ahora puedo ayudarte con cualquier consulta sobre el programa.`;
     }
 
-    // Contexto del programa (prompt del sistema)
+    // Contexto del programa completo
     const contextoPrograma = `Eres un asistente amigable y profesional del Centro de Informática de la Universidad Señor de Sipán (USS).
 
 ${contextualPrompt}
@@ -275,8 +301,8 @@ A) CAMPUS VIRTUAL USS:
 2. Ir a "Trámites"
 3. Seleccionar "Programación de Servicios"
 4. Escuela Profesional: INGENIERÍA DE SISTEMAS (Egresado)
-5. Servicio: PROGRAMA DE COMPUTACIÓN PARA EGRESADOS USS
-6. Cantidad: 1, Importe: 200.00
+5. Seleccionar "Programa de Computación para Egresados"
+6. Llenar datos solicitados
 7. Click "Programar"
 8. Ir a "Gestión Financiera" → "Pagos con tarjeta-QR"
 9. Realizar el pago
@@ -303,72 +329,72 @@ EVALUACIÓN:
 - 4 Cuestionarios (C1, C2, C3, C4)
 - Promedio = (C1 + C2 + C3 + C4) / 4
 
+CONSTANCIAS DE EGRESO:
+- Solicitar en Mesa de Partes (presencial/virtual)
+- Costo: S/ 15
+- Tiempo de entrega: 3-5 días hábiles
+- Requisitos: DNI, foto, pago
+
+HORARIOS DE ATENCIÓN:
+- Presencial: Lunes a Viernes 8:00 AM - 5:00 PM
+- Virtual: 24/7 mediante este chatbot
+- Respuesta por correo: 24-48 horas
+
 CONTACTO:
 - Email: centrodeinformatica@uss.edu.pe
 - WhatsApp: 986 724 506
 - Instagram: @centrodeinformaticauss
 - Facebook: Centro de Informática USS
 
-INSTRUCCIONES:
-- Sé amigable y natural
-- Usa emojis apropiadamente
-- Si dan correo @uss.edu.pe, confirma y explica siguientes pasos
-- Verifica año de egreso para elegibilidad
-- Respuestas concisas pero completas`;
+Responde de manera amigable y profesional. Si no tienes información específica, dirige al estudiante a contactar directamente centrodeinformatica@uss.edu.pe o WhatsApp 986 724 506.`;
 
-    // Fallback progresivo entre modelos
-    const modelsToTry = [
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent',
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent'
-    ];
-
-    let lastError = null;
-
-    for (const modelUrl of modelsToTry) {
-      try {
-        const response = await fetch(
-          `${modelUrl}?key=${GEMINI_API_KEY}`,
+    // Llamar a Gemini AI
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
           {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              contents: [{
-                parts: [{
-                  text: `${contextoPrograma}\n\nUsuario: ${message}\n\nAsistente:`
-                }]
-              }],
-              generationConfig: {
-                temperature: 0.7,
-                topK: 40,
-                topP: 0.95,
-                maxOutputTokens: 1024,
-              }
-            })
+            parts: [
+              { text: contextoPrograma },
+              { text: `Usuario dice: ${message}` }
+            ]
           }
-        );
+        ],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 1000,
+        },
+      }),
+    });
 
-        const data = await response.json();
-
-        if (response.ok && data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
-          const text = data.candidates[0].content.parts[0].text;
-          return res.status(200).json({ response: text });
-        }
-
-        lastError = data.error?.message || 'Error desconocido';
-      } catch (error) {
-        lastError = error.message;
-      }
+    if (!response.ok) {
+      throw new Error(`Error ${response.status}: ${response.statusText}`);
     }
 
-    throw new Error(`No se pudo conectar con ningún modelo de Gemini. Último error: ${lastError}`);
+    const data = await response.json();
+    
+    if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+      throw new Error('Respuesta inválida de la API de Gemini');
+    }
+
+    const botResponse = data.candidates[0].content.parts[0].text;
+
+    console.log('✅ Respuesta generada exitosamente');
+    
+    return res.status(200).json({
+      response: botResponse,
+      dataComplete: dataComplete,
+      sessionData: sessionData
+    });
+
   } catch (error) {
-    console.error('Error en /api/chat:', error);
-    return res.status(500).json({
-      error: 'Error al procesar la consulta',
-      details: error.message,
+    console.error('❌ Error en /api/chat:', error);
+    return res.status(500).json({ 
+      error: 'Error interno del servidor',
+      message: error.message 
     });
   }
 };
