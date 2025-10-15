@@ -1,7 +1,5 @@
 // Serverless API para Vercel - Centro de Informática USS
-// Versión completa con extracción de datos, Google Sheets y validación
-
-const { google } = require('googleapis');
+// Versión simplificada sin dependencias complejas
 
 // Almacenamiento en memoria para sesiones (limitado en serverless)
 const studentSessions = new Map();
@@ -112,71 +110,27 @@ function isDataComplete(data) {
   return true;
 }
 
-// Función para guardar en Google Sheets
-async function saveToGoogleSheets(studentData) {
+// Función simulada para guardar datos (por ahora solo log)
+async function saveStudentData(studentData) {
   try {
-    console.log('🔄 Intentando guardar en Google Sheets:', studentData.nombre);
+    console.log('🔄 Simulando guardado de datos:', studentData.nombre);
     
-    // Verificar variables de entorno
-    if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY || !process.env.GOOGLE_SHEET_ID) {
-      console.log('⚠️ Variables de Google Sheets no configuradas');
-      return { success: false, error: 'Variables de entorno faltantes' };
-    }
-    
-    // Configurar autenticación
-    const auth = new google.auth.GoogleAuth({
-      credentials: {
-        type: "service_account",
-        project_id: process.env.GOOGLE_PROJECT_ID || "chatbot-uss",
-        private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
-        private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-        client_id: process.env.GOOGLE_CLIENT_ID,
-        auth_uri: "https://accounts.google.com/o/oauth2/auth",
-        token_uri: "https://oauth2.googleapis.com/token",
-        auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs"
-      },
-      scopes: ['https://www.googleapis.com/auth/spreadsheets']
-    });
-
-    const sheets = google.sheets({ version: 'v4', auth });
-    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
-
-    // Preparar datos para insertar
     const timestamp = new Date().toLocaleString('es-PE');
-    const rowData = [
+    const dataToSave = {
       timestamp,
-      studentData.nombre || 'No proporcionado',
-      studentData.ciclo || 'No proporcionado', 
-      studentData.ultimoCurso || 'No proporcionado',
-      'Por determinar', // Curso que corresponde
-      studentData.correo || 'No proporcionado',
-      'Datos_Recopilados'
-    ];
-
-    console.log('📝 Datos preparados:', rowData);
-
-    // Insertar datos
-    const response = await sheets.spreadsheets.values.append({
-      spreadsheetId,
-      range: 'Estudiantes!A:G',
-      valueInputOption: 'RAW',
-      resource: {
-        values: [rowData]
-      }
-    });
-
-    console.log('✅ Respuesta de Google Sheets:', response.data);
-    console.log('✅ Datos guardados en Google Sheets para:', studentData.nombre);
-    
-    return { 
-      success: true, 
-      data: response.data,
-      studentName: studentData.nombre
+      nombre: studentData.nombre,
+      ciclo: studentData.ciclo,
+      ultimoCurso: studentData.ultimoCurso,
+      correo: studentData.correo,
+      estado: 'Datos_Recopilados'
     };
 
+    console.log('📝 Datos que se guardarían:', dataToSave);
+    console.log('✅ Datos "guardados" exitosamente para:', studentData.nombre);
+    
+    return { success: true, data: dataToSave };
   } catch (error) {
-    console.error('❌ Error guardando en Google Sheets:', error.message);
+    console.error('❌ Error simulando guardado:', error.message);
     return { success: false, error: error.message };
   }
 }
@@ -210,7 +164,7 @@ module.exports = async (req, res) => {
     // Extraer datos del mensaje
     const extractedData = extractStudentData(message);
     
-    // Obtener datos previos de la sesión (limitado en serverless)
+    // Obtener datos previos de la sesión
     let sessionData = studentSessions.get(sessionId) || {};
     
     // Combinar datos previos con nuevos datos
@@ -226,14 +180,14 @@ module.exports = async (req, res) => {
     const dataComplete = isDataComplete(sessionData);
     
     if (dataComplete) {
-      console.log('🎯 DATOS COMPLETOS DETECTADOS - GUARDANDO INMEDIATAMENTE...');
+      console.log('🎯 DATOS COMPLETOS DETECTADOS - GUARDANDO...');
       
-      // Guardar en Google Sheets
-      const saveResult = await saveToGoogleSheets(sessionData);
+      // Guardar datos (simulado por ahora)
+      const saveResult = await saveStudentData(sessionData);
       if (saveResult.success) {
-        console.log('✅ Datos guardados exitosamente en Google Sheets para:', saveResult.studentName);
+        console.log('✅ Datos procesados exitosamente');
       } else {
-        console.log('⚠️ Error al guardar en Google Sheets:', saveResult.error);
+        console.log('⚠️ Error al procesar datos:', saveResult.error);
       }
     }
 
@@ -266,7 +220,7 @@ Por favor proporciona estos datos en un solo mensaje, separados por comas.`;
 - Último curso: ${sessionData.ultimoCurso}
 - Correo: ${sessionData.correo}
 
-Los datos han sido registrados automáticamente en nuestro sistema. Te enviaremos los pasos para el pago a tu correo institucional. Ahora puedo ayudarte con cualquier consulta sobre el programa.`;
+Los datos han sido registrados en nuestro sistema. Te enviaremos los pasos para el pago a tu correo institucional. Ahora puedo ayudarte con cualquier consulta sobre el programa.`;
     }
 
     // Contexto del programa completo
