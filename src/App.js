@@ -1,20 +1,23 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Moon, Sun } from 'lucide-react';
+import { Send, Bot, User, Moon, Sun, Mic, Menu } from 'lucide-react';
 
 function App() {
-  const [showWelcome, setShowWelcome] = useState(true);
-  const [welcomeStep, setWelcomeStep] = useState(0);
-  const [audioEnabled, setAudioEnabled] = useState(true);
-  
+  // Generar sessionId único en cada recarga (F5 = sesión nueva)
+  const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  const [showSplash, setShowSplash] = useState(true);
   const [messages, setMessages] = useState([
-    { type: 'bot', text: '¡Hola! 👋 Soy Camilito, tu asistente del Centro de Informática USS.\n\n¿En qué puedo ayudarte hoy?' }
+    { type: 'bot', text: '¡Hola! 👋 Bienvenido al Centro de Informática de la Universidad Señor de Sipán. Soy tu asistente virtual y estoy aquí para ayudarte con consultas sobre nuestros servicios informáticos. ¿En qué puedo asistirte?' }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [recognition, setRecognition] = useState(null);
   const messagesEndRef = useRef(null);
 
-  const API_URL = '/api/chat';
+  const API_URL = process.env.NODE_ENV === 'production' 
+    ? '/api/chat' 
+    : 'http://localhost:5000/api/chat';
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -24,52 +27,57 @@ function App() {
     scrollToBottom();
   }, [messages]);
 
+  // Debug: mostrar sessionId en consola
+  useEffect(() => {
+    console.log('🆔 Nueva sesión iniciada:', sessionId);
+  }, [sessionId]);
+
   useEffect(() => {
     const savedTheme = localStorage.getItem('darkMode');
     if (savedTheme === 'true') {
       setDarkMode(true);
     }
-  }, []);
 
-  const speakMessage = (text) => {
-    if ('speechSynthesis' in window && audioEnabled) {
-      speechSynthesis.cancel();
+    // Inicializar reconocimiento de voz
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognitionInstance = new SpeechRecognition();
       
-      setTimeout(() => {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'es-ES';
-        utterance.rate = 0.9;
-        utterance.pitch = 1.2;
-        utterance.volume = 1.0;
+      recognitionInstance.continuous = true;
+      recognitionInstance.interimResults = true;
+      recognitionInstance.lang = 'es-ES';
+      
+      recognitionInstance.onstart = () => {
+        setIsListening(true);
+      };
+      
+      recognitionInstance.onresult = (event) => {
+        let finalTranscript = '';
         
-        speechSynthesis.speak(utterance);
-      }, 100);
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+          }
+        }
+        
+        if (finalTranscript) {
+          setInput(prev => prev + finalTranscript);
+        }
+      };
+      
+      recognitionInstance.onend = () => {
+        setIsListening(false);
+      };
+      
+      recognitionInstance.onerror = (event) => {
+        console.error('Error de reconocimiento de voz:', event.error);
+        setIsListening(false);
+      };
+      
+      setRecognition(recognitionInstance);
     }
-  };
-
-  useEffect(() => {
-    if (!showWelcome) return;
-
-    const timer1 = setTimeout(() => {
-      setWelcomeStep(1);
-      speakMessage("¡Hola! Bienvenidos al Centro de Informática de la Universidad Señor de Sipán. Soy tu amigo Camilito. Este chat es para egresados hasta el año dos mil veintitrés guión dos. ¡Empecemos!");
-    }, 1000);
-
-    const timer2 = setTimeout(() => setWelcomeStep(2), 7000);
-    const timer3 = setTimeout(() => {
-      setWelcomeStep(3);
-      setShowWelcome(false);
-    }, 8500);
-
-    return () => {
-      clearTimeout(timer1);
-      clearTimeout(timer2);
-      clearTimeout(timer3);
-      if ('speechSynthesis' in window) {
-        speechSynthesis.cancel();
-      }
-    };
-  }, [showWelcome]);
+  }, []);
 
   const toggleDarkMode = () => {
     const newMode = !darkMode;
@@ -103,7 +111,10 @@ function App() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: input }),
+        body: JSON.stringify({ 
+          message: input,
+          sessionId: sessionId
+        }),
       });
 
       const data = await response.json();
@@ -133,369 +144,360 @@ function App() {
     }
   };
 
-  const quickButtons = [
-    { label: '¿Puedo inscribirme?', query: 'Soy egresado, ¿puedo inscribirme?' },
-    { label: 'Computación 3', query: 'Necesito información de Computación 3' },
-    { label: '¿Cómo pago?', query: '¿Cómo realizo el pago desde campus virtual?' },
-    { label: 'Contacto', query: 'Necesito datos de contacto' }
-  ];
 
-  const handleQuickButton = (query) => {
-    setInput(query);
+
+  const startChat = () => {
+    setShowSplash(false);
   };
 
-  // Robot 3D completo con cuerpo y piernas - MEJORADO
-  const RobotComplete = ({ size = 'large', animate = false }) => {
-    const isLarge = size === 'large';
-    const scale = isLarge ? 1 : 0.4;
-    
+  const toggleVoiceRecognition = () => {
+    if (!recognition) {
+      alert('Tu navegador no soporta reconocimiento de voz. Prueba con Chrome o Edge.');
+      return;
+    }
+
+    if (isListening) {
+      recognition.stop();
+    } else {
+      recognition.start();
+    }
+  };
+
+  // Splash Screen Component
+  if (showSplash) {
     return (
-      <div className={`relative ${animate ? 'animate-bounce-slow' : ''}`} style={{
-        transform: `scale(${scale})`,
-        transformOrigin: 'center center'
-      }}>
-        {/* Sombra base */}
-        <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-32 h-6 bg-black/20 rounded-full blur-xl"></div>
-        
-        {/* Antena */}
-        <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 flex flex-col items-center">
-          <div className="w-1 h-8 bg-gradient-to-b from-blue-400 to-blue-600"></div>
-          <div className="w-3 h-3 bg-red-500 rounded-full shadow-lg animate-pulse"></div>
+      <div className="min-h-screen relative overflow-hidden bg-green-700">
+        {/* Animated background elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-20 left-10 w-72 h-72 bg-white/10 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-20 right-10 w-96 h-96 bg-green-600/20 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-white/8 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
         </div>
         
-        {/* Cabeza del robot */}
-        <div className="relative w-24 h-24 mx-auto">
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-400 via-blue-500 to-blue-700 rounded-2xl shadow-2xl border-4 border-blue-300 transform rotate-3">
-            <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-transparent rounded-2xl"></div>
-            
-            {/* Ojos */}
-            <div className="absolute top-6 left-3 flex gap-3">
-              <div className="relative">
-                <div className="w-6 h-6 bg-white rounded-full shadow-inner"></div>
-                <div className={`absolute top-1 left-1 w-4 h-4 bg-blue-600 rounded-full ${animate ? 'animate-ping' : ''}`}></div>
-              </div>
-              <div className="relative">
-                <div className="w-6 h-6 bg-white rounded-full shadow-inner"></div>
-                <div className={`absolute top-1 left-1 w-4 h-4 bg-blue-600 rounded-full ${animate ? 'animate-ping' : ''}`}></div>
-              </div>
-            </div>
-            
-            {/* Boca/Pantalla */}
-            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 w-14 h-3 bg-gray-800 rounded-full border-2 border-gray-600">
-              {animate && (
-                <div className="absolute inset-0 flex items-center justify-center gap-0.5">
-                  <div className="w-1 h-1 bg-green-400 rounded-full animate-pulse"></div>
-                  <div className="w-1 h-1 bg-green-400 rounded-full animate-pulse" style={{animationDelay: '0.1s'}}></div>
-                  <div className="w-1 h-1 bg-green-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+        {/* Floating particles */}
+        <div className="absolute inset-0">
+          <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-white/60 rounded-full animate-ping"></div>
+          <div className="absolute top-3/4 left-3/4 w-1 h-1 bg-green-300/80 rounded-full animate-ping" style={{animationDelay: '0.5s'}}></div>
+          <div className="absolute top-1/2 left-1/6 w-1.5 h-1.5 bg-white/70 rounded-full animate-ping" style={{animationDelay: '1.5s'}}></div>
+          <div className="absolute top-1/6 right-1/4 w-1 h-1 bg-blue-400/60 rounded-full animate-ping" style={{animationDelay: '2.5s'}}></div>
+        </div>
+        
+        <div className="relative z-10 min-h-screen flex items-center justify-center p-8">
+          <div className="text-center max-w-md mx-auto">
+            {/* Logo/Robot container */}
+            <div className="relative mb-12">
+              {/* Outer glow ring */}
+              <div className="absolute inset-0 w-40 h-40 mx-auto rounded-full bg-green-600 opacity-25 animate-spin" style={{animationDuration: '8s'}}></div>
+              
+              {/* Robot container */}
+              <div className="relative w-32 h-32 mx-auto">
+                <div className="w-full h-full rounded-full bg-white shadow-2xl border-4 border-green-500/50 flex items-center justify-center backdrop-blur-lg">
+                  <Bot className="w-16 h-16 text-green-700 drop-shadow-lg animate-bounce" />
                 </div>
-              )}
+                
+                {/* Status indicators */}
+                <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full border-4 border-white shadow-lg animate-pulse flex items-center justify-center">
+                  <div className="w-3 h-3 bg-white rounded-full"></div>
+                </div>
+                
+                {/* Floating mini elements */}
+                <div className="absolute -top-6 -left-4 w-4 h-4 bg-green-400 rounded-full animate-bounce opacity-80" style={{animationDelay: '0.5s'}}></div>
+                <div className="absolute -bottom-4 -right-6 w-3 h-3 bg-white rounded-full animate-bounce opacity-70" style={{animationDelay: '1s'}}></div>
+              </div>
             </div>
-          </div>
-          
-          {/* Orejas/Auriculares */}
-          <div className="absolute top-8 -left-4 w-4 h-8 bg-gradient-to-r from-blue-500 to-blue-600 rounded-l-full border-2 border-blue-400"></div>
-          <div className="absolute top-8 -right-4 w-4 h-8 bg-gradient-to-l from-blue-500 to-blue-600 rounded-r-full border-2 border-blue-400"></div>
-        </div>
-        
-        {/* Cuello */}
-        <div className="w-8 h-4 mx-auto bg-gradient-to-b from-blue-600 to-blue-700 border-x-2 border-blue-400"></div>
-        
-        {/* Cuerpo */}
-        <div className="relative w-32 h-36 mx-auto bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700 rounded-3xl shadow-2xl border-4 border-blue-300">
-          <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-transparent rounded-3xl"></div>
-          
-          {/* Panel central */}
-          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 w-20 h-24 bg-gray-800 rounded-2xl border-2 border-gray-600 overflow-hidden">
-            <div className="absolute inset-2 bg-gradient-to-br from-blue-900 to-indigo-900 rounded-xl">
-              <div className="absolute top-2 left-2 flex gap-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" style={{animationDelay: '0.3s'}}></div>
-                <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse" style={{animationDelay: '0.6s'}}></div>
+            
+            {/* Title with gradient text */}
+            <div className="mb-6">
+              <h1 className="text-5xl md:text-6xl font-black text-white mb-3 drop-shadow-2xl">
+                USS Assistant
+              </h1>
+              <div className="w-24 h-1 bg-white mx-auto rounded-full"></div>
+            </div>
+            
+            {/* Subtitle */}
+            <p className="text-green-100 text-xl font-light mb-12 leading-relaxed">
+              Tu asistente inteligente del
+              <br />
+              <span className="font-semibold text-white">
+                Centro de Informática USS
+              </span>
+            </p>
+            
+            {/* Interactive start button */}
+            <button 
+              onClick={startChat}
+              className="group relative bg-white hover:bg-green-50 text-green-700 font-bold text-lg px-10 py-5 rounded-2xl shadow-2xl hover:shadow-white/25 transition-all duration-300 hover:scale-110 active:scale-95 transform"
+            >
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Mic className="w-6 h-6 group-hover:animate-pulse" />
+                  <div className="absolute inset-0 bg-white/20 rounded-full animate-ping opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                </div>
+                <span>Comenzar Chat</span>
               </div>
               
-              <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2">
-                <Bot className="w-8 h-8 text-blue-400" />
+              {/* Button glow effect */}
+              <div className="absolute inset-0 rounded-2xl bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
+            </button>
+            
+            {/* Feature hints */}
+            <div className="mt-8 flex justify-center space-x-6 text-blue-100 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                <span>Reconocimiento de voz</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-300 rounded-full animate-pulse" style={{animationDelay: '0.5s'}}></div>
+                <span>IA Avanzada</span>
               </div>
             </div>
           </div>
-          
-          {/* Brazo izquierdo */}
-          <div className="absolute top-8 -left-6 w-6 h-20 bg-gradient-to-b from-blue-500 to-blue-700 rounded-full border-2 border-blue-400 transform -rotate-12"></div>
-          <div className="absolute top-28 -left-7 w-5 h-5 bg-blue-400 rounded-full border-2 border-blue-300 shadow-lg"></div>
-          
-          {/* Brazo derecho con mano saludando */}
-          <div className="absolute top-8 -right-6 w-6 h-20 bg-gradient-to-b from-blue-500 to-blue-700 rounded-full border-2 border-blue-400 transform rotate-12"></div>
-          <div className="absolute top-28 -right-7 w-5 h-5 bg-blue-400 rounded-full border-2 border-blue-300 shadow-lg"></div>
-          
-          {/* Manita saludando con animación */}
-          {isLarge && (
-            <div className={`absolute top-24 -right-12 text-3xl ${animate ? 'animate-wave' : ''}`} style={{
-              filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))',
-              transformOrigin: 'bottom center'
-            }}>
-              👋
-            </div>
-          )}
         </div>
-        
-        {/* Cadera */}
-        <div className="w-28 h-3 mx-auto bg-gradient-to-b from-blue-700 to-gray-700 border-x-2 border-blue-400"></div>
-        
-        {/* Piernas */}
-        <div className="flex gap-4 justify-center mt-1">
-          <div className="relative">
-            <div className="w-8 h-16 bg-gradient-to-b from-gray-700 to-gray-800 rounded-b-xl border-2 border-gray-600">
-              <div className="absolute top-8 left-1/2 transform -translate-x-1/2 w-6 h-2 bg-gray-600 rounded-full"></div>
-            </div>
-            <div className="relative -mt-1">
-              <div className="w-10 h-6 bg-gradient-to-br from-gray-800 to-gray-900 rounded-b-xl rounded-tr-xl border-2 border-gray-700 shadow-lg"></div>
-              <div className="absolute bottom-0 left-0 w-10 h-2 bg-black/30 rounded-full"></div>
-            </div>
-          </div>
-          
-          <div className="relative">
-            <div className="w-8 h-16 bg-gradient-to-b from-gray-700 to-gray-800 rounded-b-xl border-2 border-gray-600">
-              <div className="absolute top-8 left-1/2 transform -translate-x-1/2 w-6 h-2 bg-gray-600 rounded-full"></div>
-            </div>
-            <div className="relative -mt-1">
-              <div className="w-10 h-6 bg-gradient-to-br from-gray-800 to-gray-900 rounded-b-xl rounded-tl-xl border-2 border-gray-700 shadow-lg"></div>
-              <div className="absolute bottom-0 left-0 w-10 h-2 bg-black/30 rounded-full"></div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Ondas de sonido cuando habla */}
-        {animate && isLarge && (
-          <>
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-48 h-48 border-4 border-yellow-300/40 rounded-full animate-ping"></div>
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-56 h-56 border-4 border-green-300/30 rounded-full animate-ping" style={{animationDelay: '0.3s'}}></div>
-          </>
-        )}
       </div>
     );
-  };
+  }
 
   return (
-    <>
-      <style>{`
-        @keyframes wave {
-          0%, 100% { transform: rotate(0deg); }
-          20% { transform: rotate(25deg); }
-          40% { transform: rotate(-20deg); }
-          60% { transform: rotate(25deg); }
-          80% { transform: rotate(-20deg); }
-        }
-        @keyframes bounce-slow {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-10px); }
-        }
-        .animate-wave {
-          animation: wave 1.5s ease-in-out infinite;
-        }
-        .animate-bounce-slow {
-          animation: bounce-slow 2s ease-in-out infinite;
-        }
-      `}</style>
-      
-      {/* Animación de bienvenida */}
-      {showWelcome && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 overflow-hidden">
-          {/* Partículas de fondo */}
-          <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute top-20 left-20 w-32 h-32 bg-white/5 rounded-full blur-3xl animate-pulse"></div>
-            <div className="absolute bottom-20 right-20 w-40 h-40 bg-blue-300/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
-            <div className="absolute top-1/2 left-1/4 w-24 h-24 bg-indigo-300/10 rounded-full blur-2xl animate-pulse" style={{animationDelay: '0.5s'}}></div>
-          </div>
-          
-          {/* Robot Camilito completo */}
-          <div className={`relative transition-all duration-1000 ease-in-out ${
-            welcomeStep === 0 ? 'scale-0 opacity-0' : 
-            welcomeStep === 1 ? 'scale-100 opacity-100' :
-            welcomeStep === 2 ? 'scale-50 translate-x-[40vw] translate-y-[35vh]' :
-            'scale-25 translate-x-[45vw] translate-y-[40vh] opacity-0'
-          }`}>
-            <RobotComplete size="large" animate={welcomeStep === 1} />
-          </div>
-          
-          {/* Indicador de que está hablando */}
-          {welcomeStep === 1 && (
-            <div className="absolute bottom-32 left-1/2 transform -translate-x-1/2 text-center text-white">
-              <div className="flex items-center justify-center space-x-2 bg-black/30 backdrop-blur-md rounded-full px-8 py-4 shadow-xl border border-white/10">
-                <div className="w-2.5 h-2.5 bg-white rounded-full animate-bounce"></div>
-                <div className="w-2.5 h-2.5 bg-white rounded-full animate-bounce" style={{animationDelay: '0.15s'}}></div>
-                <div className="w-2.5 h-2.5 bg-white rounded-full animate-bounce" style={{animationDelay: '0.3s'}}></div>
-                <span className="ml-4 text-base font-semibold">Camilito está hablando...</span>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-      
-      {/* Camilito pequeño en la esquina */}
-      {!showWelcome && (
-        <div className="fixed bottom-6 right-6 z-40 cursor-pointer hover:scale-110 transition-transform duration-200">
-          <RobotComplete size="small" />
-        </div>
-      )}
-
-      {/* Interfaz principal del chat */}
-      <div className={`flex flex-col h-screen max-w-4xl mx-auto transition-colors duration-300 ${
-        darkMode 
-          ? 'bg-gradient-to-br from-gray-900 to-gray-800' 
-          : 'bg-gradient-to-br from-blue-50 to-indigo-50'
-      } ${showWelcome ? 'pointer-events-none opacity-0' : 'pointer-events-auto opacity-100'}`}>
+    <div className="min-h-screen relative overflow-hidden bg-green-700">
+      {/* Animated background elements - same as splash */}
+      <div className="absolute inset-0">
+        {/* Main gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-green-700 via-green-800 to-green-900"></div>
         
-        {/* Header */}
-        <div className={`p-6 shadow-lg transition-colors duration-300 ${
-          darkMode
-            ? 'bg-gradient-to-r from-gray-800 to-gray-700 text-white'
-            : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white'
-        }`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Bot className="w-8 h-8" />
-              <div>
-                <h1 className="text-2xl font-bold">Asistente USS</h1>
-                <p className={`text-sm ${darkMode ? 'text-gray-300' : 'text-blue-100'}`}>
-                  Programa de Computación para Egresados
-                </p>
-              </div>
+        {/* Floating orbs */}
+        <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-green-400/20 rounded-full blur-xl animate-pulse"></div>
+        <div className="absolute top-3/4 right-1/4 w-24 h-24 bg-green-300/15 rounded-full blur-lg animate-pulse" style={{animationDelay: '1s'}}></div>
+        <div className="absolute top-1/2 left-3/4 w-20 h-20 bg-white/10 rounded-full blur-md animate-pulse" style={{animationDelay: '2s'}}></div>
+        
+        {/* Animated dots */}
+        <div className="absolute top-1/3 right-1/3 w-2 h-2 bg-white/80 rounded-full animate-ping" style={{animationDelay: '0.5s'}}></div>
+        <div className="absolute bottom-1/3 left-1/5 w-1.5 h-1.5 bg-green-300/70 rounded-full animate-ping" style={{animationDelay: '1s'}}></div>
+        <div className="absolute top-1/2 left-1/6 w-1.5 h-1.5 bg-white/70 rounded-full animate-ping" style={{animationDelay: '1.5s'}}></div>
+        <div className="absolute top-1/6 right-1/4 w-1 h-1 bg-green-400/60 rounded-full animate-ping" style={{animationDelay: '2.5s'}}></div>
+      </div>
+
+      {/* Chat container */}
+      <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
+        <div className={`flex flex-col w-full max-w-md mx-auto md:max-w-2xl lg:max-w-4xl h-[calc(100vh-2rem)] md:rounded-lg overflow-hidden transition-all duration-300 ${
+          darkMode 
+            ? 'bg-gray-900 border-2 border-green-400 shadow-2xl shadow-green-400/30' 
+            : 'bg-white border-2 border-green-600 shadow-2xl shadow-green-600/50 ring-4 ring-green-500/30'
+        }`} style={{
+          boxShadow: darkMode 
+            ? '0 0 40px rgba(74, 222, 128, 0.3), inset 0 0 20px rgba(74, 222, 128, 0.1)' 
+            : '0 0 40px rgba(34, 197, 94, 0.4), inset 0 0 20px rgba(34, 197, 94, 0.1)'
+        }}>
+      {/* Header */}
+      <div className={`shadow-sm border-b p-4 transition-colors duration-300 ${
+        darkMode 
+          ? 'bg-gray-800 border-gray-700' 
+          : 'bg-white border-gray-200'
+      }`}>
+        {/* Mobile status bar */}
+        <div className="flex md:hidden items-center justify-between mb-4">
+          <div className="flex items-center gap-4">
+            <button className="p-1" onClick={toggleDarkMode}>
+              <Menu className={`w-5 h-5 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+            </button>
+            <span className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              {new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+          
+          <div className="flex items-center gap-1">
+            <div className="flex gap-1">
+              <div className="w-1 h-1 bg-gray-900 rounded-full"></div>
+              <div className="w-1 h-1 bg-gray-900 rounded-full"></div>
+              <div className="w-1 h-1 bg-gray-900 rounded-full"></div>
+              <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
             </div>
-            
-            {/* Controles */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setAudioEnabled(!audioEnabled)}
-                className={`p-3 rounded-full transition-all duration-300 ${
-                  darkMode
-                    ? 'bg-gray-600 hover:bg-gray-500'
-                    : 'bg-white/20 hover:bg-white/30'
-                } ${audioEnabled ? 'text-green-300' : 'text-red-300'}`}
-                title={audioEnabled ? 'Desactivar audio' : 'Activar audio'}
-              >
-                {audioEnabled ? '🔊' : '🔇'}
-              </button>
-              
-              <button
-                onClick={toggleDarkMode}
-                className={`p-3 rounded-full transition-all duration-300 ${
-                  darkMode
-                    ? 'bg-gray-600 hover:bg-gray-500 text-yellow-300'
-                    : 'bg-white/20 hover:bg-white/30 text-white'
-                }`}
-                title={darkMode ? 'Modo claro' : 'Modo oscuro'}
-              >
-                {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-              </button>
+            <svg className="w-6 h-6 ml-2" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M2 17h20v2H2zm1.15-4.05L4 11.47l.85 1.48c.5-.3 1.08-.5 1.65-.5s1.15.2 1.65.5L9 11.47l.85 1.48c.5-.3 1.08-.5 1.65-.5s1.15.2 1.65.5L14 11.47l.85 1.48c.5-.3 1.08-.5 1.65-.5s1.15.2 1.65.5L19 11.47l.85 1.48c.5-.3 1.08-.5 1.65-.5V15H2v-2.05z"/>
+            </svg>
+            <div className="ml-1 text-right">
+              <div className="text-xs font-bold">100%</div>
             </div>
           </div>
         </div>
-
-        {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {messages.map((message, index) => (
-            <div key={index}>
-              <div className={`flex items-start gap-3 ${message.type === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
-                  message.type === 'user'
-                    ? darkMode 
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-indigo-600 text-white'
-                    : darkMode
-                      ? 'bg-gray-700 text-blue-400 shadow-lg'
-                      : 'bg-white text-blue-600 shadow-md'
-                }`}>
-                  {message.type === 'user' ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
-                </div>
-                <div className={`max-w-2xl p-4 rounded-2xl shadow-sm transition-colors duration-300 ${
-                  message.type === 'user'
-                    ? darkMode
-                      ? 'bg-blue-600 text-white rounded-tr-none'
-                      : 'bg-indigo-600 text-white rounded-tr-none'
-                    : darkMode
-                      ? 'bg-gray-700 text-gray-100 rounded-tl-none shadow-lg'
-                      : 'bg-gradient-to-br from-blue-50 to-indigo-50 text-gray-800 rounded-tl-none border-2 border-blue-200 shadow-md'
-                }`}>
-                  <div 
-                    className="leading-relaxed"
-                    dangerouslySetInnerHTML={{ __html: formatMessage(message.text) }}
-                  />
-                </div>
-              </div>
-              
-              {index === 0 && message.type === 'bot' && (
-                <div className="flex flex-wrap gap-2 mt-3 ml-14">
-                  {quickButtons.map((button, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => handleQuickButton(button.query)}
-                      className={`px-4 py-2 rounded-full text-sm transition-all duration-300 shadow-sm ${
-                        darkMode
-                          ? 'bg-gray-700 text-blue-300 hover:bg-gray-600'
-                          : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                      }`}
-                    >
-                      {button.label}
-                    </button>
-                  ))}
-                </div>
-              )}
+        
+        {/* Chat Header */}
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <div className="w-12 h-12 rounded-full bg-green-700 flex items-center justify-center shadow-lg">
+              <Bot className="w-7 h-7 text-white" />
             </div>
-          ))}
-          
-          {isLoading && (
-            <div className="flex items-start gap-3">
-              <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
-                darkMode ? 'bg-gray-700 text-blue-400 shadow-lg' : 'bg-white text-blue-600 shadow-md'
-              }`}>
-                <Bot className="w-5 h-5" />
-              </div>
-              <div className={`p-4 rounded-2xl rounded-tl-none shadow-sm ${darkMode ? 'bg-gray-700' : 'bg-white'}`}>
-                <div className="flex gap-2">
-                  <div className={`w-2 h-2 rounded-full animate-bounce ${darkMode ? 'bg-blue-400' : 'bg-blue-600'}`} style={{animationDelay: '0ms'}}></div>
-                  <div className={`w-2 h-2 rounded-full animate-bounce ${darkMode ? 'bg-blue-400' : 'bg-blue-600'}`} style={{animationDelay: '150ms'}}></div>
-                  <div className={`w-2 h-2 rounded-full animate-bounce ${darkMode ? 'bg-blue-400' : 'bg-blue-600'}`} style={{animationDelay: '300ms'}}></div>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Input Area */}
-        <div className={`border-t p-4 shadow-lg transition-colors duration-300 ${
-          darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-        }`}>
-          <div className="max-w-4xl mx-auto flex gap-3">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              disabled={isLoading}
-              placeholder="Escribe tu consulta aquí..."
-              className={`flex-1 p-3 border-2 rounded-full focus:outline-none transition-all duration-300 font-medium ${
-                darkMode
-                  ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 shadow-sm'
-                  : 'bg-white border-gray-400 text-gray-900 placeholder-gray-500 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/20 shadow-md hover:border-gray-500 hover:shadow-lg'
-              } disabled:opacity-50 disabled:bg-gray-200 disabled:cursor-not-allowed`}
-            />
-            <button
-              onClick={handleSend}
-              disabled={isLoading || !input.trim()}
-              className={`p-3 rounded-full transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
-                darkMode
-                  ? 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white'
-                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white'
-              }`}
-            >
-              <Send className="w-5 h-5" />
+            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white"></div>
+          </div>
+          <div className="flex-1">
+            <h1 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Centro de Informática USS</h1>
+            <p className="text-sm text-green-500 font-medium">En línea</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button className={`p-2 rounded-full transition-colors duration-200 hidden md:block ${
+              darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+            }`} onClick={toggleDarkMode}>
+              {darkMode ? <Sun className="w-5 h-5 text-yellow-400" /> : <Moon className="w-5 h-5 text-gray-600" />}
             </button>
           </div>
         </div>
       </div>
-    </>
+
+      {/* Voice Recording Indicator */}
+      {isListening && (
+        <div className="bg-red-500 text-white px-4 py-2 text-center text-sm font-medium animate-pulse">
+          <div className="flex items-center justify-center gap-2">
+            <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
+            Escuchando... Habla ahora
+            <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
+          </div>
+        </div>
+      )}
+
+      {/* Messages Area */}
+      <div className={`flex-1 overflow-y-auto p-4 space-y-4 md:p-6 transition-colors duration-300 ${
+        darkMode 
+          ? 'bg-gray-800' 
+          : 'bg-gray-50'
+      }`}>
+        {messages.map((message, index) => (
+          <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+            {/* Bot messages */}
+            {message.type === 'bot' && (
+              <div className="flex items-start gap-3 max-w-[85%] md:max-w-[70%] group">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-green-700 flex items-center justify-center shadow-lg flex-shrink-0 group-hover:shadow-green-600/40 group-hover:scale-105 transition-all duration-300">
+                  <Bot className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                </div>
+                <div className={`rounded-2xl rounded-tl-md p-4 md:p-5 backdrop-blur-sm border-2 group-hover:shadow-xl group-hover:scale-[1.02] transition-all duration-300 ${
+                  darkMode 
+                    ? 'bg-gradient-to-br from-gray-800/95 to-gray-700/90 border-green-400/40 text-gray-100 shadow-lg shadow-green-400/25' 
+                    : 'bg-gradient-to-br from-green-50/90 to-white/95 border-green-400/60 text-gray-800 shadow-lg shadow-green-600/20'
+                } relative overflow-hidden`}>
+                  <div className={`absolute inset-0 bg-gradient-to-r ${
+                    darkMode 
+                      ? 'from-green-500/5 to-transparent' 
+                      : 'from-green-100/50 to-transparent'
+                  } pointer-events-none`}></div>
+                  <div className="relative z-10">
+                    <div 
+                      className={`text-sm md:text-base leading-relaxed ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}
+                      dangerouslySetInnerHTML={{ __html: formatMessage(message.text) }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* User messages */}
+            {message.type === 'user' && (
+              <div className="flex items-start gap-3 max-w-[85%] md:max-w-[70%] flex-row-reverse group">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-green-700 flex items-center justify-center shadow-lg flex-shrink-0 group-hover:shadow-green-600/40 group-hover:scale-105 transition-all duration-300">
+                  <User className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                </div>
+                <div className="bg-green-700 rounded-2xl rounded-tr-md p-4 md:p-5 shadow-lg shadow-green-700/25 backdrop-blur-sm group-hover:shadow-xl group-hover:shadow-green-700/40 group-hover:scale-[1.02] transition-all duration-300 border border-green-600/50">
+                  <div className="text-white text-sm md:text-base leading-relaxed">
+                    {message.text}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+        
+        
+        {/* Loading indicator */}
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="flex items-start gap-3 max-w-[80%] group">
+              <div className="w-8 h-8 rounded-full bg-green-700 flex items-center justify-center shadow-lg animate-pulse">
+                <Bot className="w-5 h-5 text-white" />
+              </div>
+              <div className={`rounded-2xl rounded-tl-md p-4 md:p-5 backdrop-blur-sm border-2 shadow-lg transition-all duration-300 ${
+                darkMode 
+                  ? 'bg-gray-800/90 border-green-400/30 shadow-green-400/20' 
+                  : 'bg-white/95 border-green-300/50 shadow-green-600/15'
+              }`}>
+                <div className="flex gap-2">
+                  <div className={`w-2.5 h-2.5 rounded-full animate-bounce transition-colors duration-300 ${darkMode ? 'bg-green-400' : 'bg-green-600'}`} style={{animationDelay: '0ms'}}></div>
+                  <div className={`w-2.5 h-2.5 rounded-full animate-bounce transition-colors duration-300 ${darkMode ? 'bg-green-400' : 'bg-green-600'}`} style={{animationDelay: '150ms'}}></div>
+                  <div className={`w-2.5 h-2.5 rounded-full animate-bounce transition-colors duration-300 ${darkMode ? 'bg-green-400' : 'bg-green-600'}`} style={{animationDelay: '300ms'}}></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        <div ref={messagesEndRef} />
+        </div>
+
+      {/* Input Area */}
+      <div className={`border-t p-4 md:p-6 transition-colors duration-300 ${
+        darkMode 
+          ? 'bg-gray-800 border-gray-700' 
+          : 'bg-white border-gray-200'
+      }`}>
+        <div className="flex items-end gap-3 max-w-4xl mx-auto">
+          <div className="flex-1">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyPress={handleKeyPress}
+              disabled={isLoading}
+              rows={1}
+              placeholder={isListening ? "🎤 Escuchando... Habla ahora" : "Escribe aquí tu consulta"}
+              className={`w-full rounded-2xl px-4 py-3 md:py-4 md:px-6 focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-200 text-sm md:text-base disabled:opacity-50 disabled:cursor-not-allowed resize-none ${
+                darkMode 
+                  ? 'bg-gray-700 text-white placeholder-gray-400 focus:bg-gray-600 border border-gray-600 focus:border-green-400' 
+                  : 'bg-white text-gray-900 placeholder-gray-500 focus:bg-white border-2 border-green-200 focus:border-green-400 shadow-sm'
+              }`}
+              style={{
+                minHeight: '48px',
+                maxHeight: '120px',
+                overflowY: 'hidden'
+              }}
+              onInput={(e) => {
+                // Auto-resize textarea
+                e.target.style.height = 'auto';
+                const newHeight = Math.min(e.target.scrollHeight, 120);
+                e.target.style.height = newHeight + 'px';
+                
+                // Solo mostrar scroll si el contenido excede el máximo
+                if (e.target.scrollHeight > 120) {
+                  e.target.style.overflowY = 'auto';
+                } else {
+                  e.target.style.overflowY = 'hidden';
+                }
+              }}
+            />
+          </div>
+          
+          {input.trim() && (
+            <button
+              onClick={handleSend}
+              disabled={isLoading}
+              className="bg-gradient-to-r from-green-600 to-green-700 text-white p-2 rounded-full hover:shadow-lg transition-all duration-200 disabled:opacity-50 hover:scale-105 active:scale-95 flex-shrink-0"
+            >
+              <Send className="w-6 h-6" />
+            </button>
+          )}
+          
+          <button 
+            onClick={toggleVoiceRecognition}
+            className={`p-2 rounded-full transition-all duration-200 ${
+              isListening
+                ? 'bg-green-700 text-white animate-pulse shadow-lg shadow-green-600/25'
+                : darkMode 
+                  ? 'text-green-400 hover:bg-green-700' 
+                  : 'text-green-700 hover:bg-green-50'
+            }`}
+            title={isListening ? 'Detener grabación' : 'Iniciar grabación de voz'}
+          >
+            <Mic className={`w-6 h-6 ${isListening ? 'animate-pulse' : ''}`} />
+          </button>
+        </div>
+      </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
