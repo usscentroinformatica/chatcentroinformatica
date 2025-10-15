@@ -292,31 +292,15 @@ function App() {
           ? 'bg-gray-800 border-gray-700' 
           : 'bg-white border-gray-200'
       }`}>
-        {/* Mobile status bar */}
-        <div className="flex md:hidden items-center justify-between mb-4">
-          <div className="flex items-center gap-4">
-            <button className="p-1" onClick={toggleDarkMode}>
-              <Menu className={`w-5 h-5 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
-            </button>
-            <span className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-              {new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-            </span>
-          </div>
-          
-          <div className="flex items-center gap-1">
-            <div className="flex gap-1">
-              <div className="w-1 h-1 bg-gray-900 rounded-full"></div>
-              <div className="w-1 h-1 bg-gray-900 rounded-full"></div>
-              <div className="w-1 h-1 bg-gray-900 rounded-full"></div>
-              <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
-            </div>
-            <svg className="w-6 h-6 ml-2" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M2 17h20v2H2zm1.15-4.05L4 11.47l.85 1.48c.5-.3 1.08-.5 1.65-.5s1.15.2 1.65.5L9 11.47l.85 1.48c.5-.3 1.08-.5 1.65-.5s1.15.2 1.65.5L14 11.47l.85 1.48c.5-.3 1.08-.5 1.65-.5s1.15.2 1.65.5L19 11.47l.85 1.48c.5-.3 1.08-.5 1.65-.5V15H2v-2.05z"/>
-            </svg>
-            <div className="ml-1 text-right">
-              <div className="text-xs font-bold">100%</div>
-            </div>
-          </div>
+        {/* Mobile status bar - Solo botón de tema */}
+        <div className="flex md:hidden items-center justify-end mb-4">
+          <button className="p-2" onClick={toggleDarkMode}>
+            {darkMode ? (
+              <Sun className="w-5 h-5 text-yellow-400" />
+            ) : (
+              <Moon className="w-5 h-5 text-gray-600" />
+            )}
+          </button>
         </div>
         
         {/* Chat Header */}
