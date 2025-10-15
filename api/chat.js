@@ -117,10 +117,16 @@ async function saveStudentData(studentData) {
   try {
     console.log('🔄 Guardando REAL en Google Sheets:', studentData.nombre);
     
-    // Verificar variables de entorno
+    // Verificar variables de entorno con logs detallados
+    console.log('🔍 Verificando variables de entorno...');
+    console.log('GOOGLE_SERVICE_ACCOUNT_EMAIL:', !!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL);
+    console.log('GOOGLE_PRIVATE_KEY:', !!process.env.GOOGLE_PRIVATE_KEY);
+    console.log('GOOGLE_SHEET_ID:', !!process.env.GOOGLE_SHEET_ID);
+    
     if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY || !process.env.GOOGLE_SHEET_ID) {
-      console.log('⚠️ Variables de Google Sheets no configuradas en Vercel');
-      return { success: false, error: 'Variables de entorno faltantes' };
+      console.log('❌ Variables de Google Sheets NO configuradas en Vercel Dashboard');
+      console.log('💡 Ve a Settings > Environment Variables en Vercel y agrega todas las variables');
+      return { success: false, error: 'Variables de entorno faltantes - configúralas en Vercel Dashboard' };
     }
 
     console.log('🔑 Configurando autenticación Google Sheets...');
