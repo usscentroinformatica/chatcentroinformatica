@@ -15,9 +15,8 @@ function App() {
   const [recognition, setRecognition] = useState(null);
   const messagesEndRef = useRef(null);
 
-  const API_URL = process.env.NODE_ENV === 'production' 
-    ? '/api/chat' 
-    : 'http://localhost:5000/api/chat';
+  // Usar la ruta relativa para Vercel (siempre /api/chat en producción)
+  const API_URL = '/api/chat';
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -258,35 +257,11 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-green-700">
-      {/* Animated background elements - same as splash */}
-      <div className="absolute inset-0">
-        {/* Main gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-green-700 via-green-800 to-green-900"></div>
-        
-        {/* Floating orbs */}
-        <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-green-400/20 rounded-full blur-xl animate-pulse"></div>
-        <div className="absolute top-3/4 right-1/4 w-24 h-24 bg-green-300/15 rounded-full blur-lg animate-pulse" style={{animationDelay: '1s'}}></div>
-        <div className="absolute top-1/2 left-3/4 w-20 h-20 bg-white/10 rounded-full blur-md animate-pulse" style={{animationDelay: '2s'}}></div>
-        
-        {/* Animated dots */}
-        <div className="absolute top-1/3 right-1/3 w-2 h-2 bg-white/80 rounded-full animate-ping" style={{animationDelay: '0.5s'}}></div>
-        <div className="absolute bottom-1/3 left-1/5 w-1.5 h-1.5 bg-green-300/70 rounded-full animate-ping" style={{animationDelay: '1s'}}></div>
-        <div className="absolute top-1/2 left-1/6 w-1.5 h-1.5 bg-white/70 rounded-full animate-ping" style={{animationDelay: '1.5s'}}></div>
-        <div className="absolute top-1/6 right-1/4 w-1 h-1 bg-green-400/60 rounded-full animate-ping" style={{animationDelay: '2.5s'}}></div>
-      </div>
-
-      {/* Chat container */}
-      <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
-        <div className={`flex flex-col w-full max-w-md mx-auto md:max-w-2xl lg:max-w-4xl h-[calc(100vh-2rem)] md:rounded-lg overflow-hidden transition-all duration-300 ${
-          darkMode 
-            ? 'bg-gray-900 border-2 border-green-400 shadow-2xl shadow-green-400/30' 
-            : 'bg-white border-2 border-green-600 shadow-2xl shadow-green-600/50 ring-4 ring-green-500/30'
-        }`} style={{
-          boxShadow: darkMode 
-            ? '0 0 40px rgba(74, 222, 128, 0.3), inset 0 0 20px rgba(74, 222, 128, 0.1)' 
-            : '0 0 40px rgba(34, 197, 94, 0.4), inset 0 0 20px rgba(34, 197, 94, 0.1)'
-        }}>
+    <div className={`flex flex-col h-screen max-w-4xl mx-auto transition-colors duration-300 ${
+      darkMode 
+        ? 'bg-gradient-to-br from-gray-900 to-gray-800' 
+        : 'bg-gradient-to-br from-blue-50 to-indigo-50'
+    }`}>
       {/* Header */}
       <div className={`shadow-sm border-b p-4 transition-colors duration-300 ${
         darkMode 
