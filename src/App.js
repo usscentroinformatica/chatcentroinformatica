@@ -259,16 +259,31 @@ function App() {
   }
 
   return (
-    <div className={`flex flex-col h-screen max-w-4xl mx-auto transition-colors duration-300 ${
+    <div className={`flex flex-col h-screen max-w-4xl mx-auto transition-colors duration-300 relative ${
       darkMode 
         ? 'bg-gradient-to-br from-gray-900 to-gray-800' 
-        : 'bg-gradient-to-br from-blue-50 to-indigo-50'
+        : 'bg-gradient-to-br from-green-700 via-green-600 to-green-800'
     }`}>
+      {/* Elementos animados de fondo similar al splash */}
+      {!darkMode && (
+        <>
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute top-20 left-10 w-32 h-32 bg-white/5 rounded-full blur-3xl animate-pulse"></div>
+            <div className="absolute bottom-20 right-10 w-48 h-48 bg-green-500/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
+            <div className="absolute top-1/2 left-1/3 w-24 h-24 bg-white/3 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
+          </div>
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="absolute top-1/4 right-1/4 w-1 h-1 bg-white/40 rounded-full animate-ping"></div>
+            <div className="absolute bottom-1/3 left-1/4 w-0.5 h-0.5 bg-green-300/60 rounded-full animate-ping" style={{animationDelay: '0.5s'}}></div>
+            <div className="absolute top-2/3 right-1/6 w-1 h-1 bg-white/50 rounded-full animate-ping" style={{animationDelay: '1.5s'}}></div>
+          </div>
+        </>
+      )}
       {/* Header */}
-      <div className={`shadow-sm border-b p-4 transition-colors duration-300 ${
+      <div className={`shadow-sm border-b p-4 transition-colors duration-300 backdrop-blur-md relative z-10 ${
         darkMode 
           ? 'bg-gray-800 border-gray-700' 
-          : 'bg-white border-gray-200'
+          : 'bg-white/90 border-white/30'
       }`}>
         {/* Mobile status bar */}
         <div className="flex md:hidden items-center justify-between mb-4">
@@ -331,10 +346,10 @@ function App() {
       )}
 
       {/* Messages Area */}
-      <div className={`flex-1 overflow-y-auto p-4 space-y-4 md:p-6 transition-colors duration-300 ${
+      <div className={`flex-1 overflow-y-auto p-4 space-y-4 md:p-6 transition-colors duration-300 relative ${
         darkMode 
           ? 'bg-gray-800' 
-          : 'bg-gray-50'
+          : 'bg-white/10 backdrop-blur-sm'
       }`}>
         {messages.map((message, index) => (
           <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -407,10 +422,10 @@ function App() {
         </div>
 
       {/* Input Area */}
-      <div className={`border-t p-4 md:p-6 transition-colors duration-300 ${
+      <div className={`border-t p-4 md:p-6 transition-colors duration-300 backdrop-blur-md relative z-10 ${
         darkMode 
           ? 'bg-gray-800 border-gray-700' 
-          : 'bg-white border-gray-200'
+          : 'bg-white/90 border-white/30'
       }`}>
         <div className="flex items-end gap-3 max-w-4xl mx-auto">
           <div className="flex-1">
