@@ -152,6 +152,18 @@ async function saveStudentData(studentData) {
 
     console.log('📊 Preparando datos para insertar...');
 
+    // Mapear curso que le corresponde según el último aprobado
+    let cursoCorresponde = 'Por determinar';
+    if (studentData.ultimoCurso) {
+      if (studentData.ultimoCurso.toLowerCase().includes('ninguno')) {
+        cursoCorresponde = 'Computación 1';
+      } else if (studentData.ultimoCurso.toLowerCase().includes('computación 1')) {
+        cursoCorresponde = 'Computación 2';
+      } else if (studentData.ultimoCurso.toLowerCase().includes('computación 2')) {
+        cursoCorresponde = 'Computación 3';
+      }
+    }
+
     // Preparar datos para insertar
     const timestamp = new Date().toLocaleString('es-PE');
     const rowData = [
@@ -159,7 +171,7 @@ async function saveStudentData(studentData) {
       studentData.nombre || 'No proporcionado',
       studentData.ciclo || 'No proporcionado',
       studentData.ultimoCurso || 'No proporcionado',
-      'Por determinar', // Curso que corresponde
+      cursoCorresponde, // Curso que corresponde (CORREGIDO)
       studentData.correo || 'No proporcionado',
       'Datos_Recopilados'
     ];
@@ -272,27 +284,44 @@ FORMATO IMPORTANTE para correo: Debe terminar en @uss.edu.pe o @crece.uss.edu.pe
 
 Por favor proporciona estos datos en un solo mensaje, separados por comas.`;
     } else {
-      contextualPrompt = `✅ DATOS COMPLETOS RECIBIDOS Y REGISTRADOS:
+      // Determinar curso que le corresponde
+      let cursoSiguiente = 'Computación 1';
+      if (sessionData.ultimoCurso && sessionData.ultimoCurso.toLowerCase().includes('computación 1')) {
+        cursoSiguiente = 'Computación 2';
+      } else if (sessionData.ultimoCurso && sessionData.ultimoCurso.toLowerCase().includes('computación 2')) {
+        cursoSiguiente = 'Computación 3';
+      }
+      
+      contextualPrompt = `✅ DATOS RECIBIDOS Y REGISTRADOS:
 - Nombre: ${sessionData.nombre}
 - Ciclo de egreso: ${sessionData.ciclo} 
-- Último curso: ${sessionData.ultimoCurso}
+- Último curso aprobado: ${sessionData.ultimoCurso}
 - Correo: ${sessionData.correo}
+- Curso que te corresponde: ${cursoSiguiente}
 
-Los datos han sido registrados en nuestro sistema. Te enviaremos los pasos para el pago a tu correo institucional. Ahora puedo ayudarte con cualquier consulta sobre el programa.`;
+Tus datos han sido registrados exitosamente. Te enviaremos la información detallada para el proceso de inscripción a tu correo institucional.
+
+¿Tienes alguna consulta específica sobre el programa o necesitas información adicional?
+
+RESPONDE DE FORMA BREVE Y AMIGABLE. NO muestres información de pagos a menos que el usuario lo solicite específicamente.`;
     }
 
-    // Contexto del programa completo
+    // Contexto del programa - respuestas graduales
     const contextoPrograma = `Eres un asistente amigable y profesional del Centro de Informática de la Universidad Señor de Sipán (USS).
 
 ${contextualPrompt}
 
-INFORMACIÓN DEL PROGRAMA:
+INFORMACIÓN BÁSICA DEL PROGRAMA:
 - Nombre: Programa de Computación para Egresados USS
-- Dirigido a: Egresados de pregrado USS hasta el ciclo 2023-2 que tengan pendiente acreditación de cursos de computación
+- Dirigido a: Egresados de pregrado USS hasta el ciclo 2023-2
 - Modalidad: 100% virtual mediante Aula USS (www.aulauss.edu.pe)
-- Disponibilidad: 24/7, autoaprendizaje
 - Costo: S/ 200 por nivel
-- Fecha límite: 31 de diciembre para completar actividades
+
+INSTRUCCIONES DE RESPUESTA:
+- Sé BREVE y AMIGABLE en tus respuestas
+- NO muestres información completa de pagos a menos que se solicite específicamente
+- Solo proporciona información detallada cuando el usuario pregunte por ella
+- Responde de forma conversacional, no como un manual
 
 NIVELES DISPONIBLES:
 1. Computación 1: Microsoft Word (Intermedio-Avanzado)
