@@ -221,7 +221,17 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AIzaSyDB0hTWu-d3i5EIlzA34KwjEN4nQiq_SjE';
+    // ✅ SEGURO - Solo usa variable de entorno
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+// Verificar que existe
+if (!GEMINI_API_KEY) {
+  console.error('❌ GEMINI_API_KEY no está configurada');
+  return res.status(500).json({ 
+    error: 'Configuración del servidor incompleta',
+    message: 'La API key de Gemini no está configurada' 
+  });
+}
     
     const { message, sessionId } = req.body || {};
     if (!message) {
