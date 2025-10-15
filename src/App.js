@@ -15,8 +15,10 @@ function App() {
   const [recognition, setRecognition] = useState(null);
   const messagesEndRef = useRef(null);
 
-  // Usar la ruta relativa para Vercel (siempre /api/chat en producción)
-  const API_URL = '/api/chat';
+  // Configuración de API URL para desarrollo y producción
+  const API_URL = process.env.NODE_ENV === 'production' 
+    ? '/api/chat' 
+    : 'http://localhost:5000/api/chat';
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
