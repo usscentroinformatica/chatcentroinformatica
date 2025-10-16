@@ -333,7 +333,7 @@ function App() {
       )}
 
       {/* Messages Area */}
-      <div className={`flex-1 overflow-y-auto p-4 space-y-4 md:p-6 transition-colors duration-300 ${
+      <div className={`chat-messages flex-1 overflow-y-auto p-4 space-y-4 md:p-6 transition-colors duration-300 ${
         darkMode 
           ? 'bg-gray-800' 
           : 'bg-gray-50'
