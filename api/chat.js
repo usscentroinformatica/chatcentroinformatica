@@ -3,10 +3,59 @@
 
 // Almacenamiento en memoria para sesiones (temporal)
 const studentSessions = new Map();
+const studentData = new Map();
+
+// Función para extraer datos del estudiante
+function extractStudentData(message) {
+  const data = {};
+  const issues = [];
+  
+  // Extraer nombre
+  const nombreMatch = message.match(/(?:mi nombre es|me llamo|soy)\s+([a-záéíóúüñ\s]+?)(?:,|\s+\d{4}|$)/i);
+  if (nombreMatch && nombreMatch[1].trim().split(' ').length >= 2) {
+    data.nombre = nombreMatch[1].trim();
+  }
+  
+  // Extraer ciclo - CRÍTICO: Validar elegibilidad
+  const cicloMatch = message.match(/(\d{4}-[12])/);
+  if (cicloMatch) {
+    data.ciclo = cicloMatch[1];
+    const [year, semester] = data.ciclo.split('-');
+    const yearNum = parseInt(year);
+    const semesterNum = parseInt(semester);
+    
+    // Verificar si es elegible (hasta 2023-2)
+    if (yearNum > 2023 || (yearNum === 2023 && semesterNum > 2)) {
+      issues.push('ciclo_no_elegible');
+      data.elegible = false;
+    } else {
+      data.elegible = true;
+    }
+  }
+  
+  // Extraer curso aprobado
+  const cursoMatch = message.match(/(?:computaci[óo]n|comp)\s*([123]|ninguno)/i);
+  if (cursoMatch) {
+    data.ultimoCurso = cursoMatch[1] === 'ninguno' ? 'ninguno' : `Computación ${cursoMatch[1]}`;
+  }
+  
+  // Extraer correo
+  const correoMatch = message.match(/([a-zA-Z0-9._%+-]+@(?:uss\.edu\.pe|crece\.uss\.edu\.pe))/i);
+  if (correoMatch) {
+    data.correo = correoMatch[1].toLowerCase();
+  }
+  
+  if (issues.length > 0) {
+    data.issues = issues;
+  }
+  
+  return data;
+}
 
 // Configuración del contexto del Centro de Informática USS
-const SYSTEM_CONTEXT = `
-Eres un asistente virtual del Centro de Informática de la Universidad Señor de Sipán (USS) en Chiclayo, Perú.
+const SYSTEM_CONTEXT = `Eres un asistente virtual del Centro de Informática de la Universidad Señor de Sipán (USS) en Chiclayo, Perú. Tu objetivo es ayudar al estudiante de manera natural y resolutiva, usando la información oficial y los mensajes institucionales. Solo deriva al contacto oficial si la consulta es demasiado específica o no puedes resolverla.
+
+IMPORTANTE: El Programa de Computación para Egresados es para TODOS los egresados de pregrado de CUALQUIER carrera que tengan pendiente la acreditación de cursos de computación. NO menciones específicamente "Ingeniería de Sistemas" u otras carreras individuales; mantén el enfoque general para todas las carreras de pregrado.
 
 INFORMACIÓN INSTITUCIONAL:
 - Universidad: Universidad Señor de Sipán (USS)
@@ -16,7 +65,26 @@ INFORMACIÓN INSTITUCIONAL:
 - Teléfono: 986 724 506
 
 SERVICIOS QUE OFRECES:
-1. **Constancias y Certificados:**
+1. **Programa de Computación para Egresados:**
+   Invitación: Si aún no has acreditado el curso de Computación para Egresados, puedes hacerlo ahora. El programa es 100% virtual y de autoaprendizaje, disponible las 24 horas y sin horarios fijos. Para inscribirte, escribe y recibirás los pasos de inscripción.
+
+   Información general:
+   - Dirigido a egresados de pregrado (de cualquier carrera) hasta el ciclo 2023-2 que tengan pendiente la acreditación de cursos de computación.
+   - Modalidad: 100% virtual (Aula USS)
+   - Contenidos:
+     - Computación 1: Microsoft Word (Intermedio – Avanzado)
+     - Computación 2: Microsoft Excel (Básico – Intermedio – Avanzado)
+     - Computación 3: IBM SPSS y MS Project
+   - Costo por nivel: S/ 200
+   - Manual con pasos para registro disponible.
+
+   Confirmación de registro:
+   Al inscribirte, recibirás acceso al Aula USS (www.aulauss.edu.pe) con tu usuario y contraseña institucional. El curso es autogestionado y debes completarlo antes del 31 de diciembre. Al finalizar, responde al correo para inscribirte al siguiente nivel.
+
+   Finalización y acceso al siguiente nivel:
+   Al terminar un nivel, puedes inscribirte en el siguiente realizando el pago y enviando el comprobante a centrodeinformatica@uss.edu.pe. Puedes llevar los niveles en paralelo.
+
+2. **Constancias y Certificados:**
    - Constancia de Estudios
    - Constancia de Notas  
    - Constancia de Ranking
@@ -24,14 +92,13 @@ SERVICIOS QUE OFRECES:
    - Costo: S/ 15.00 por documento
    - Tiempo: 3-5 días hábiles
 
-2. **Horarios de Atención:**
+3. **Horarios de Atención:**
    - Presencial: Lunes a Viernes 8:00 AM - 6:00 PM, Sábados 8:00 AM - 12:00 PM
    - Virtual: 24/7 través del chat
    - Email: Respuesta en 24-48 horas
 
-3. **Información Académica:**
+4. **Información Académica:**
    - Matrícula y procesos académicos
-   - Programas de Ingeniería de Sistemas
    - Cursos: Computación I, II, III
    - Modalidades de pago
 
@@ -39,14 +106,14 @@ PERSONALIDAD:
 - Profesional y amigable
 - Usa emojis apropiados
 - Proporciona información específica y útil
+- Enfócate en el Programa de Computación para Egresados como general para todas las carreras de pregrado.
 - Siempre ofrece contactos para consultas complejas
 
 RESPUESTAS:
 - Sé específico sobre los servicios del Centro de Informática
 - Menciona costos, tiempos y requisitos cuando sea relevante
 - Para dudas complejas, deriva a los contactos oficiales
-- Mantén un tono profesional pero cercano
-`;
+- Mantén un tono profesional pero cercano`;
 
 export default async function handler(req, res) {
   // Configurar CORS
@@ -63,13 +130,36 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { message, sessionId } = req.body;
+    const { message, sessionId = 'default' } = req.body;
 
     if (!message) {
       return res.status(400).json({ error: 'Mensaje requerido' });
     }
 
     console.log('📩 Consulta recibida:', { sessionId, message: message.substring(0, 100) });
+
+    // Extraer datos del estudiante del mensaje actual
+    const extractedData = extractStudentData(message);
+    let currentData = studentData.get(sessionId) || {};
+    currentData = { ...currentData, ...extractedData };
+    currentData.lastActivity = Date.now();
+    studentData.set(sessionId, currentData);
+
+    // Determinar contexto adicional basado en elegibilidad
+    let additionalContext = '';
+    if (currentData.ciclo && currentData.elegible === false) {
+      additionalContext = `
+      ATENCIÓN: El estudiante indicó que egresó en ${currentData.ciclo}.
+      Este ciclo NO ES ELEGIBLE para el programa (posterior a 2023-2).
+      Debes informarle amablemente que no puede acceder al programa y sugerir alternativas.
+      NO continues con el proceso de inscripción.
+      `;
+    } else if (currentData.ciclo && currentData.elegible === true) {
+      additionalContext = `
+      El estudiante egresó en ${currentData.ciclo} - ES ELEGIBLE para el programa.
+      Puedes continuar con el proceso de inscripción, incluyendo invitación y detalles completos.
+      `;
+    }
 
     // Verificar API key de Gemini
     if (!process.env.GEMINI_API_KEY) {
@@ -113,7 +203,7 @@ export default async function handler(req, res) {
               {
                 parts: [
                   {
-                    text: `Contexto del sistema: ${SYSTEM_CONTEXT}\n\nHistorial de conversación:\n${sessionHistory.map(msg => `${msg.role}: ${msg.content}`).join('\n')}\n\nResponde como asistente del Centro de Informática USS:`
+                    text: `Contexto del sistema: ${SYSTEM_CONTEXT}\n\n${additionalContext}\n\nDatos actuales del estudiante: ${JSON.stringify(currentData)}\n\nHistorial de conversación:\n${sessionHistory.map(msg => `${msg.role}: ${msg.content}`).join('\n')}\n\nResponde como asistente del Centro de Informática USS:`
                   }
                 ]
               }
@@ -172,7 +262,9 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ 
       response: botResponse,
-      sessionId: sessionId
+      sessionId: sessionId,
+      studentData: currentData,
+      isEligible: currentData.elegible !== false
     });
 
   } catch (error) {

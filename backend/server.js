@@ -74,13 +74,15 @@ function extractStudentData(message) {
 // Contexto actualizado del Centro de Informática USS
 const SYSTEM_CONTEXT = `Eres un asistente virtual del Centro de Informática de la Universidad Señor de Sipán (USS) en Chiclayo, Perú. Tu objetivo es ayudar al estudiante de manera natural y resolutiva, usando la información oficial y los mensajes institucionales. Solo deriva al contacto oficial si la consulta es demasiado específica o no puedes resolverla.
 
+IMPORTANTE: El Programa de Computación para Egresados es para TODOS los egresados de pregrado de CUALQUIER carrera que tengan pendiente la acreditación de cursos de computación. NO menciones específicamente "Ingeniería de Sistemas" u otras carreras individuales; mantén el enfoque general para todas las carreras de pregrado.
+
 ---
 
 PROGRAMA DE COMPUTACIÓN PARA EGRESADOS:
 Invitación: Si aún no has acreditado el curso de Computación para Egresados, puedes hacerlo ahora. El programa es 100% virtual y de autoaprendizaje, disponible las 24 horas y sin horarios fijos. Para inscribirte, escribe y recibirás los pasos de inscripción.
 
 Información general:
-- Dirigido a egresados de pregrado hasta el ciclo 2023-2 que tengan pendiente la acreditación de cursos de computación.
+- Dirigido a egresados de pregrado (de cualquier carrera) hasta el ciclo 2023-2 que tengan pendiente la acreditación de cursos de computación.
 - Modalidad: 100% virtual (Aula USS)
 - Contenidos:
   - Computación 1: Microsoft Word (Intermedio – Avanzado)
@@ -111,6 +113,7 @@ PERSONALIDAD Y RESPUESTAS:
 - Sé profesional, amigable y claro.
 - Usa emojis apropiados.
 - Proporciona información específica y útil.
+- Enfócate en el Programa de Computación para Egresados como general para todas las carreras de pregrado.
 - Solo deriva al contacto oficial si no puedes resolver la consulta.`;
 
 app.post('/api/chat', async (req, res) => {
@@ -322,8 +325,8 @@ setInterval(() => {
 // Iniciar servidor
 app.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
-  console.log(`📡 Centro de Informática USS - Chatbot v2.1`);
-  console.log(`✅ Validación de elegibilidad activada (hasta 2023-2) con info actualizada`);
+  console.log(`📡 Centro de Informática USS - Chatbot v2.2`);
+  console.log(`✅ Validación de elegibilidad activada (hasta 2023-2) - General para todas las carreras`);
   
   if (!GEMINI_API_KEY) {
     console.log(`⚠️  ADVERTENCIA: GEMINI_API_KEY no configurada`);
