@@ -1,7 +1,3 @@
-// Serverless API para Vercel - Centro de Informática USS
-// Versión simplificada sin Google Sheets - Solo Gemini AI
-
-// Almacenamiento en memoria para sesiones (temporal)
 const studentSessions = new Map();
 const studentData = new Map();
 
@@ -208,10 +204,10 @@ export default async function handler(req, res) {
                 ]
               }
             ],
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 1024,
-            }
+                   generationConfig: {
+                    temperature: 0.6,
+                    maxOutputTokens: 768
+                   }
           })
         });
 

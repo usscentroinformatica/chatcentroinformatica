@@ -38,6 +38,27 @@
 }
 
 /* Animaciones personalizadas para Camilito */
+/* Scrollbar personalizado para el chatbot */
+::-webkit-scrollbar {
+  width: 10px;
+  background: #232946;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #0057b8 0%, #00c2cb 100%);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #00c2cb 0%, #0057b8 100%);
+}
+::-webkit-scrollbar-track {
+  background: #eebbc3;
+  border-radius: 8px;
+}
+/* Para Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #00c2cb #eebbc3;
+}
 @keyframes fadeInUp {
   from {
     opacity: 0;
