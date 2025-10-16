@@ -1,215 +1,57 @@
 // Serverless API para Vercel - Centro de Informática USS
-// Versión completa con Google Sheets real
+// Versión simplificada sin Google Sheets - Solo Gemini AI
 
-const { google } = require('googleapis');
-
-// Almacenamiento en memoria para sesiones (limitado en serverless)
+// Almacenamiento en memoria para sesiones (temporal)
 const studentSessions = new Map();
 
-// Función para extraer datos del estudiante del mensaje
-function extractStudentData(message) {
-  console.log('🔍 EXTRAYENDO DATOS del mensaje:', message);
-  const data = {};
-  const issues = [];
-  
-  const cleanMessage = message.toLowerCase().trim();
-  
-  // Extraer nombre (múltiples patrones)
-  const nombrePatterns = [
-    /(?:mi nombre es|me llamo|soy)\s+([a-záéíóúüñ\s]+?)(?:,|\s+\d{4})/i,
-    /^([a-záéíóúüñ\s]+?)(?:,|\s+\d{4})/i
-  ];
-  
-  for (const pattern of nombrePatterns) {
-    const match = message.match(pattern);
-    if (match && match[1].trim().split(' ').length >= 2) {
-      data.nombre = match[1].trim();
-      console.log('✅ Nombre extraído:', data.nombre);
-      break;
-    }
-  }
-  
-  // Extraer ciclo de egreso - FORMATO ESTRICTO: YYYY-N
-  const cicloMatch = message.match(/(\d{4}-[12])/);
-  if (cicloMatch) {
-    data.ciclo = cicloMatch[1];
-    console.log('✅ Ciclo extraído:', data.ciclo);
-  } else if (message.match(/egresado[-\s]?\d/i)) {
-    issues.push('ciclo_formato_incorrecto');
-    console.log('❌ Formato de ciclo incorrecto detectado');
-  }
-  
-  // Extraer último curso aprobado
-  if (cleanMessage.includes('ninguno') || cleanMessage.includes('nunca')) {
-    data.ultimoCurso = 'ninguno';
-    console.log('✅ Curso extraído: ninguno');
-  } else {
-    const cursoPatterns = [
-      /(?:computaci[óo]n|comp)\s*([123])/i,
-      /(?:curso)\s*([123])/i,
-      /,\s*([^,]+?)\s*,/i
-    ];
-    
-    for (const pattern of cursoPatterns) {
-      const match = message.match(pattern);
-      if (match) {
-        if (pattern.source.includes('([123])')) {
-          data.ultimoCurso = `Computación ${match[1]}`;
-        } else {
-          const curso = match[1].trim();
-          if (curso.match(/computaci[óo]n\s*[123]/i)) {
-            data.ultimoCurso = curso.charAt(0).toUpperCase() + curso.slice(1);
-          }
-        }
-        console.log('✅ Curso extraído:', data.ultimoCurso);
-        break;
-      }
-    }
-  }
-  
-  // Extraer correo institucional
-  const correoMatch = message.match(/([a-zA-Z0-9._%+-]+@(?:uss\.edu\.pe|crece\.uss\.edu\.pe))/i);
-  if (correoMatch) {
-    data.correo = correoMatch[1].toLowerCase();
-    console.log('✅ Correo extraído:', data.correo);
-  }
-  
-  if (issues.length > 0) {
-    data.formatoIncorrecto = issues;
-  }
-  
-  console.log('📊 DATOS EXTRAÍDOS TOTAL:', data);
-  return data;
-}
+// Configuración del contexto del Centro de Informática USS
+const SYSTEM_CONTEXT = `
+Eres un asistente virtual del Centro de Informática de la Universidad Señor de Sipán (USS) en Chiclayo, Perú.
 
-// Función para verificar si los datos están completos
-function isDataComplete(data) {
-  console.log('🔍 VERIFICANDO SI DATOS ESTÁN COMPLETOS...');
-  const completeness = {
-    nombre: !!data.nombre,
-    ciclo: !!data.ciclo,
-    ultimoCurso: !!data.ultimoCurso,
-    correo: !!data.correo,
-    formatoIncorrecto: data.formatoIncorrecto
-  };
-  
-  console.log('🔍 Evaluando completitud de datos:', completeness);
-  
-  const hasIncorrectFormat = data.formatoIncorrecto && data.formatoIncorrecto.length > 0;
-  const missingFields = !completeness.nombre || !completeness.ciclo || !completeness.ultimoCurso || !completeness.correo;
-  
-  if (hasIncorrectFormat) {
-    console.log('❌ Datos con formato incorrecto');
-    return false;
-  }
-  
-  if (missingFields) {
-    console.log('❌ Faltan campos requeridos');
-    return false;
-  }
-  
-  console.log('✅ TODOS LOS DATOS ESTÁN COMPLETOS - LISTO PARA GUARDAR!');
-  return true;
-}
+INFORMACIÓN INSTITUCIONAL:
+- Universidad: Universidad Señor de Sipán (USS)
+- Área: Centro de Informática  
+- Ubicación: Chiclayo, Perú
+- Email: centrodeinformatica@uss.edu.pe
+- Teléfono: 986 724 506
 
-// Función REAL para guardar en Google Sheets
-async function saveStudentData(studentData) {
-  try {
-    console.log('🔄 Guardando REAL en Google Sheets:', studentData.nombre);
-    
-    // Verificar variables de entorno con logs detallados
-    console.log('🔍 Verificando variables de entorno...');
-    console.log('GOOGLE_SERVICE_ACCOUNT_EMAIL:', !!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL);
-    console.log('GOOGLE_PRIVATE_KEY:', !!process.env.GOOGLE_PRIVATE_KEY);
-    console.log('GOOGLE_SHEET_ID:', !!process.env.GOOGLE_SHEET_ID);
-    
-    if (!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY || !process.env.GOOGLE_SHEET_ID) {
-      console.log('❌ Variables de Google Sheets NO configuradas en Vercel Dashboard');
-      console.log('💡 Ve a Settings > Environment Variables en Vercel y agrega todas las variables');
-      return { success: false, error: 'Variables de entorno faltantes - configúralas en Vercel Dashboard' };
-    }
+SERVICIOS QUE OFRECES:
+1. **Constancias y Certificados:**
+   - Constancia de Estudios
+   - Constancia de Notas  
+   - Constancia de Ranking
+   - Certificado de Estudios
+   - Costo: S/ 15.00 por documento
+   - Tiempo: 3-5 días hábiles
 
-    console.log('🔑 Configurando autenticación Google Sheets...');
-    
-    // Configurar autenticación con Service Account
-    const auth = new google.auth.GoogleAuth({
-      credentials: {
-        type: "service_account",
-        project_id: process.env.GOOGLE_PROJECT_ID || "chatbot-uss",
-        private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID,
-        private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-        client_id: process.env.GOOGLE_CLIENT_ID,
-        auth_uri: "https://accounts.google.com/o/oauth2/auth",
-        token_uri: "https://oauth2.googleapis.com/token",
-        auth_provider_x509_cert_url: "https://www.googleapis.com/oauth2/v1/certs"
-      },
-      scopes: ['https://www.googleapis.com/auth/spreadsheets']
-    });
+2. **Horarios de Atención:**
+   - Presencial: Lunes a Viernes 8:00 AM - 6:00 PM, Sábados 8:00 AM - 12:00 PM
+   - Virtual: 24/7 través del chat
+   - Email: Respuesta en 24-48 horas
 
-    const sheets = google.sheets({ version: 'v4', auth });
-    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+3. **Información Académica:**
+   - Matrícula y procesos académicos
+   - Programas de Ingeniería de Sistemas
+   - Cursos: Computación I, II, III
+   - Modalidades de pago
 
-    console.log('📊 Preparando datos para insertar...');
+PERSONALIDAD:
+- Profesional y amigable
+- Usa emojis apropiados
+- Proporciona información específica y útil
+- Siempre ofrece contactos para consultas complejas
 
-    // Mapear curso que le corresponde según el último aprobado
-    let cursoCorresponde = 'Por determinar';
-    if (studentData.ultimoCurso) {
-      if (studentData.ultimoCurso.toLowerCase().includes('ninguno')) {
-        cursoCorresponde = 'Computación 1';
-      } else if (studentData.ultimoCurso.toLowerCase().includes('computación 1')) {
-        cursoCorresponde = 'Computación 2';
-      } else if (studentData.ultimoCurso.toLowerCase().includes('computación 2')) {
-        cursoCorresponde = 'Computación 3';
-      }
-    }
+RESPUESTAS:
+- Sé específico sobre los servicios del Centro de Informática
+- Menciona costos, tiempos y requisitos cuando sea relevante
+- Para dudas complejas, deriva a los contactos oficiales
+- Mantén un tono profesional pero cercano
+`;
 
-    // Preparar datos para insertar
-    const timestamp = new Date().toLocaleString('es-PE');
-    const rowData = [
-      timestamp,
-      studentData.nombre || 'No proporcionado',
-      studentData.ciclo || 'No proporcionado',
-      studentData.ultimoCurso || 'No proporcionado',
-      cursoCorresponde, // Curso que corresponde (CORREGIDO)
-      studentData.correo || 'No proporcionado',
-      'Datos_Recopilados'
-    ];
-
-    console.log('📝 Datos preparados:', rowData);
-    console.log('📍 Enviando a spreadsheet:', spreadsheetId);
-
-    // Insertar datos en Google Sheets
-    const response = await sheets.spreadsheets.values.append({
-      spreadsheetId,
-      range: 'Estudiantes!A:G',
-      valueInputOption: 'RAW',
-      resource: {
-        values: [rowData]
-      }
-    });
-
-    console.log('✅ Respuesta de Google Sheets:', response.data);
-    console.log('✅ Datos guardados REALMENTE para:', studentData.nombre);
-    
-    return { 
-      success: true, 
-      data: response.data,
-      studentName: studentData.nombre 
-    };
-
-  } catch (error) {
-    console.error('❌ Error REAL guardando en Google Sheets:', error.message);
-    console.error('🔍 Error completo:', error);
-    return { success: false, error: error.message };
-  }
-}
-
-// Función principal del endpoint
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   // Configurar CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
@@ -217,235 +59,128 @@ module.exports = async (req, res) => {
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
+    return res.status(405).json({ error: 'Método no permitido' });
   }
 
   try {
-    // ✅ SEGURO - Solo usa variable de entorno
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    const { message, sessionId } = req.body;
 
-// Verificar que existe
-if (!GEMINI_API_KEY) {
-  console.error('❌ GEMINI_API_KEY no está configurada');
-  return res.status(500).json({ 
-    error: 'Configuración del servidor incompleta',
-    message: 'La API key de Gemini no está configurada' 
-  });
-}
-    
-    const { message, sessionId } = req.body || {};
     if (!message) {
       return res.status(400).json({ error: 'Mensaje requerido' });
     }
 
-    console.log('🆔 SessionId recibido:', sessionId);
-    console.log('💬 Mensaje recibido:', message);
+    console.log('📩 Consulta recibida:', { sessionId, message: message.substring(0, 100) });
 
-    // Extraer datos del mensaje
-    const extractedData = extractStudentData(message);
-    
-    // Obtener datos previos de la sesión
-    let sessionData = studentSessions.get(sessionId) || {};
-    
-    // Combinar datos previos con nuevos datos
-    Object.assign(sessionData, extractedData);
-    sessionData.lastActivity = Date.now();
-    
-    // Guardar sesión actualizada
-    studentSessions.set(sessionId, sessionData);
-    
-    console.log('📋 Datos actualizados en sesión:', sessionData);
-
-    // Verificar si los datos están completos
-    const dataComplete = isDataComplete(sessionData);
-    
-    if (dataComplete) {
-      console.log('🎯 DATOS COMPLETOS DETECTADOS - GUARDANDO...');
-      
-      // Guardar datos REALES en Google Sheets
-      const saveResult = await saveStudentData(sessionData);
-      if (saveResult.success) {
-        console.log('✅ Datos guardados EXITOSAMENTE en Google Sheets para:', saveResult.studentName);
-      } else {
-        console.log('⚠️ Error al guardar en Google Sheets:', saveResult.error);
-      }
+    // Verificar API key de Gemini
+    if (!process.env.GEMINI_API_KEY) {
+      console.log('❌ GEMINI_API_KEY no configurada');
+      return res.status(500).json({ 
+        error: 'API key no configurada',
+        response: 'Lo siento, hay un problema de configuración. Contacta a centrodeinformatica@uss.edu.pe o llama al 986 724 506.'
+      });
     }
 
-    // Generar respuesta contextual
-    let contextualPrompt = '';
+    // Obtener historial de sesión
+    let sessionHistory = studentSessions.get(sessionId) || [];
     
-    if (sessionData.formatoIncorrecto && sessionData.formatoIncorrecto.includes('ciclo_formato_incorrecto')) {
-      contextualPrompt = `El usuario está proporcionando un formato incorrecto para el ciclo de egreso. 
-
-CORRIGE AMABLEMENTE: "Necesito que me proporciones tu ciclo de egreso en el formato correcto: YYYY-N (ejemplo: 2022-1 o 2023-2). Por favor escribe tu ciclo usando este formato: año de 4 dígitos, guión, y número del ciclo (1 o 2)."
-
-NO sigas con otras preguntas hasta que corrija el formato.`;
-    } else if (!dataComplete) {
-      const missing = [];
-      if (!sessionData.nombre) missing.push('nombre completo');
-      if (!sessionData.ciclo) missing.push('ciclo de egreso (formato: YYYY-N, ej: 2022-1)');
-      if (!sessionData.ultimoCurso) missing.push('último curso de computación aprobado (o "ninguno")');
-      if (!sessionData.correo) missing.push('correo institucional USS (@uss.edu.pe o @crece.uss.edu.pe)');
-      
-      contextualPrompt = `Necesito los siguientes datos para procesar la inscripción: ${missing.join(', ')}.
-
-FORMATO IMPORTANTE para ciclo: YYYY-N (ejemplo: 2022-1, 2023-2)
-FORMATO IMPORTANTE para correo: Debe terminar en @uss.edu.pe o @crece.uss.edu.pe
-
-Por favor proporciona estos datos en un solo mensaje, separados por comas.`;
-    } else {
-      // Determinar curso que le corresponde
-      let cursoSiguiente = 'Computación 1';
-      if (sessionData.ultimoCurso && sessionData.ultimoCurso.toLowerCase().includes('computación 1')) {
-        cursoSiguiente = 'Computación 2';
-      } else if (sessionData.ultimoCurso && sessionData.ultimoCurso.toLowerCase().includes('computación 2')) {
-        cursoSiguiente = 'Computación 3';
-      }
-      
-      contextualPrompt = `✅ DATOS RECIBIDOS Y REGISTRADOS:
-- Nombre: ${sessionData.nombre}
-- Ciclo de egreso: ${sessionData.ciclo} 
-- Último curso aprobado: ${sessionData.ultimoCurso}
-- Correo: ${sessionData.correo}
-- Curso que te corresponde: ${cursoSiguiente}
-
-Tus datos han sido registrados exitosamente. Te enviaremos la información detallada para el proceso de inscripción a tu correo institucional.
-
-¿Tienes alguna consulta específica sobre el programa o necesitas información adicional?
-
-RESPONDE DE FORMA BREVE Y AMIGABLE. NO muestres información de pagos a menos que el usuario lo solicite específicamente.`;
-    }
-
-    // Contexto del programa - respuestas graduales
-    const contextoPrograma = `Eres un asistente amigable y profesional del Centro de Informática de la Universidad Señor de Sipán (USS).
-
-${contextualPrompt}
-
-INFORMACIÓN BÁSICA DEL PROGRAMA:
-- Nombre: Programa de Computación para Egresados USS
-- Dirigido a: Egresados de pregrado USS hasta el ciclo 2023-2
-- Modalidad: 100% virtual mediante Aula USS (www.aulauss.edu.pe)
-- Costo: S/ 200 por nivel
-
-INSTRUCCIONES DE RESPUESTA:
-- Sé BREVE y AMIGABLE en tus respuestas
-- NO muestres información completa de pagos a menos que se solicite específicamente
-- Solo proporciona información detallada cuando el usuario pregunte por ella
-- Responde de forma conversacional, no como un manual
-
-NIVELES DISPONIBLES:
-1. Computación 1: Microsoft Word (Intermedio-Avanzado)
-2. Computación 2: Microsoft Excel (Básico-Intermedio-Avanzado)  
-3. Computación 3: IBM SPSS y MS Project
-
-PROCESO DE INSCRIPCIÓN:
-1. Solicitar correo institucional USS del estudiante (@uss.edu.pe o @crece.uss.edu.pe)
-2. Confirmar que le enviaremos los pasos para el pago a su correo
-3. El estudiante debe realizar pago de S/ 200
-4. Debe responder al correo adjuntando voucher de pago a centrodeinformatica@uss.edu.pe
-5. Esperar registro en Aula USS
-
-FORMAS DE PAGO (S/ 200):
-
-A) CAMPUS VIRTUAL USS:
-1. Ingresar a Campus Virtual USS
-2. Ir a "Trámites"
-3. Seleccionar "Programación de Servicios"
-4. Escuela Profesional: INGENIERÍA DE SISTEMAS (Egresado)
-5. Seleccionar "Programa de Computación para Egresados"
-6. Llenar datos solicitados
-7. Click "Programar"
-8. Ir a "Gestión Financiera" → "Pagos con tarjeta-QR"
-9. Realizar el pago
-
-B) YAPE:
-- Yapear a: Universidad Señor de Sipán
-- Buscar: "Servicios Programables"
-- Monto: S/ 200
-
-C) APLICATIVO BCP:
-- App BCP → Pagar servicios → Universidad Señor de Sipán
-- Ingresar código de alumno → Seleccionar servicio programado
-
-D) AGENTE/AGENCIA BCP:
-- Número de cuenta: 305-1552328-0-87
-- Tiempo reflejo: 3-5 horas (app/agencia), 24h (agente)
-
-ACCESO AULA USS:
-- URL: www.aulauss.edu.pe
-- Usuario: Código de alumno
-- Contraseña: Contraseña institucional
-
-EVALUACIÓN:
-- 4 Cuestionarios (C1, C2, C3, C4)
-- Promedio = (C1 + C2 + C3 + C4) / 4
-
-CONSTANCIAS DE EGRESO:
-- Solicitar en Mesa de Partes (presencial/virtual)
-- Costo: S/ 15
-- Tiempo de entrega: 3-5 días hábiles
-- Requisitos: DNI, foto, pago
-
-HORARIOS DE ATENCIÓN:
-- Presencial: Lunes a Viernes 8:00 AM - 5:00 PM
-- Virtual: 24/7 mediante este chatbot
-- Respuesta por correo: 24-48 horas
-
-CONTACTO:
-- Email: centrodeinformatica@uss.edu.pe
-- WhatsApp: 986 724 506
-- Instagram: @centrodeinformaticauss
-- Facebook: Centro de Informática USS
-
-Responde de manera amigable y profesional. Si no tienes información específica, dirige al estudiante a contactar directamente centrodeinformatica@uss.edu.pe o WhatsApp 986 724 506.`;
-
-    // Llamar a Gemini AI
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: contextoPrograma },
-              { text: `Usuario dice: ${message}` }
-            ]
-          }
-        ],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 1000,
-        },
-      }),
+    // Agregar mensaje actual al historial
+    sessionHistory.push({
+      role: 'user',
+      content: message
     });
 
-    if (!response.ok) {
-      throw new Error(`Error ${response.status}: ${response.statusText}`);
+    // Modelos a probar en orden
+    const modelsToTry = [
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent',
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent',
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent'
+    ];
+
+    let botResponse = '';
+    let lastError = null;
+    for (const modelUrl of modelsToTry) {
+      try {
+        console.log(`🤖 Probando modelo: ${modelUrl}`);
+        const response = await fetch(`${modelUrl}?key=${process.env.GEMINI_API_KEY}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: `Contexto del sistema: ${SYSTEM_CONTEXT}\n\nHistorial de conversación:\n${sessionHistory.map(msg => `${msg.role}: ${msg.content}`).join('\n')}\n\nResponde como asistente del Centro de Informática USS:`
+                  }
+                ]
+              }
+            ],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 1024,
+            }
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.text();
+          console.log(`❌ Error de Gemini (${modelUrl}):`, response.status, errorData);
+          lastError = `Error de Gemini API: ${response.status} - ${errorData}`;
+          continue; // Prueba el siguiente modelo
+        }
+
+        const data = await response.json();
+        if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+          botResponse = data.candidates[0].content.parts[0].text;
+          console.log(`✅ Respuesta recibida del modelo: ${modelUrl}`);
+          break; // Salir del ciclo si funciona
+        } else {
+          console.log(`❌ Respuesta inválida de Gemini (${modelUrl}):`, data);
+          lastError = 'Respuesta inválida de Gemini';
+        }
+      } catch (geminiError) {
+        console.log(`❌ Error al conectar con Gemini (${modelUrl}):`, geminiError.message);
+        lastError = geminiError.message;
+      }
     }
 
-    const data = await response.json();
-    
-    if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
-      throw new Error('Respuesta inválida de la API de Gemini');
+    if (!botResponse) {
+      return res.status(500).json({
+        error: lastError || 'No se pudo obtener respuesta de ningún modelo Gemini',
+        response: 'Error temporal con el servicio de IA. Por favor intenta nuevamente o contacta al administrador.'
+      });
     }
 
-    const botResponse = data.candidates[0].content.parts[0].text;
+    // Agregar respuesta del bot al historial
+    sessionHistory.push({
+      role: 'assistant',
+      content: botResponse
+    });
 
-    console.log('✅ Respuesta generada exitosamente');
-    
-    return res.status(200).json({
+    // Limitar historial a últimos 10 intercambios
+    if (sessionHistory.length > 20) {
+      sessionHistory = sessionHistory.slice(-20);
+    }
+
+    // Guardar historial actualizado
+    studentSessions.set(sessionId, sessionHistory);
+
+    console.log('✅ Respuesta enviada exitosamente');
+
+    return res.status(200).json({ 
       response: botResponse,
-      dataComplete: dataComplete,
-      sessionData: sessionData
+      sessionId: sessionId
     });
 
   } catch (error) {
-    console.error('❌ Error en /api/chat:', error);
+    console.error('❌ Error en el servidor:', error);
+    
     return res.status(500).json({ 
       error: 'Error interno del servidor',
-      message: error.message 
+      response: 'Lo siento, hubo un problema técnico. Por favor contacta a:\n📧 centrodeinformatica@uss.edu.pe\n📱 986 724 506'
     });
   }
-};
+}

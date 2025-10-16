@@ -15,10 +15,8 @@ function App() {
   const [recognition, setRecognition] = useState(null);
   const messagesEndRef = useRef(null);
 
-  // Configuración de API URL para desarrollo y producción
-  const API_URL = process.env.NODE_ENV === 'production' 
-    ? '/api/chat' 
-    : 'http://localhost:5000/api/chat';
+  // Configuración de API URL para desarrollo local
+  const API_URL = 'http://localhost:5000/api/chat';
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

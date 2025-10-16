@@ -1,2 +1,0 @@
-{"timestamp":"2025-10-15T15:13:12.228Z","lastActivity":1760541189905,"nombre":"miguel angel maquen mujica","ciclo":"2023-1","ultimoCurso":"ninguno","correo":"mmujicamiguelan@uss.edu.pe","cursoCorresponde":"Computación 1","registrado":true}
-{"timestamp":"2025-10-15T15:13:47.963Z","lastActivity":1760541225489,"nombre":"miguel angel maquen mujica","ciclo":"2023-1","ultimoCurso":"ninguno","correo":"mmujicamiguelan@uss.edu.pe","cursoCorresponde":"Computación 1","registrado":true}
