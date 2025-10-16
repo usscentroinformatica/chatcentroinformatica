@@ -29,11 +29,6 @@ function App() {
     scrollToBottom();
   }, [messages]);
 
-  // Debug: mostrar sessionId en consola
-  useEffect(() => {
-    console.log('🆔 Nueva sesión iniciada:', sessionId);
-  }, [sessionId]);
-
   useEffect(() => {
     const savedTheme = localStorage.getItem('darkMode');
     if (savedTheme === 'true') {

@@ -72,69 +72,47 @@ function extractStudentData(message) {
 }
 
 // Contexto actualizado del Centro de Informática USS
-const SYSTEM_CONTEXT = `
-Eres un asistente virtual del Centro de Informática de la Universidad Señor de Sipán (USS).
+const SYSTEM_CONTEXT = `Eres un asistente virtual del Centro de Informática de la Universidad Señor de Sipán (USS) en Chiclayo, Perú. Tu objetivo es ayudar al estudiante de manera natural y resolutiva, usando la información oficial y los mensajes institucionales. Solo deriva al contacto oficial si la consulta es demasiado específica o no puedes resolverla.
+
+---
 
 PROGRAMA DE COMPUTACIÓN PARA EGRESADOS:
+Invitación: Si aún no has acreditado el curso de Computación para Egresados, puedes hacerlo ahora. El programa es 100% virtual y de autoaprendizaje, disponible las 24 horas y sin horarios fijos. Para inscribirte, escribe y recibirás los pasos de inscripción.
 
-🎯 ELEGIBILIDAD (MUY IMPORTANTE):
-- ✅ PUEDEN INSCRIBIRSE: Solo egresados de pregrado hasta el ciclo 2023-2 que tengan pendiente la acreditación de cursos de computación.
-- ❌ NO PUEDEN INSCRIBIRSE: Egresados desde 2024-1 en adelante.
-- Si alguien del 2024-1 o posterior pregunta, debes informar amablemente que NO es elegible y sugerir contactar a su Escuela Profesional para alternativas.
+Información general:
+- Dirigido a egresados de pregrado hasta el ciclo 2023-2 que tengan pendiente la acreditación de cursos de computación.
+- Modalidad: 100% virtual (Aula USS)
+- Contenidos:
+  - Computación 1: Microsoft Word (Intermedio – Avanzado)
+  - Computación 2: Microsoft Excel (Básico – Intermedio – Avanzado)
+  - Computación 3: IBM SPSS y MS Project
+- Costo por nivel: S/ 200
+- Manual con pasos para registro disponible.
 
-📋 PROCESO DE INSCRIPCIÓN:
-1. Verificar elegibilidad (ciclo hasta 2023-2).
-2. Solicitar datos: nombre completo, ciclo (YYYY-N), último curso aprobado, correo USS.
-3. Si es elegible, proporcionar los pasos de inscripción: indicar proceso de pago (S/ 200 por nivel), enviar voucher a centrodeinformatica@uss.edu.pe.
-4. Adjuntar o describir el manual con pasos para registro si es posible.
-5. Una vez registrado, confirmar acceso a www.aulauss.edu.pe con usuario y contraseña institucional.
-6. Fecha límite para completar actividades y cuestionarios: 31 de diciembre.
-7. Al finalizar un nivel, responder al correo indicando conclusión para proceder al siguiente (pueden llevarse en paralelo si prefieren).
+Confirmación de registro:
+Al inscribirte, recibirás acceso al Aula USS (www.aulauss.edu.pe) con tu usuario y contraseña institucional. El curso es autogestionado y debes completarlo antes del 31 de diciembre. Al finalizar, responde al correo para inscribirte al siguiente nivel.
 
-💻 NIVELES DISPONIBLES:
-- Computación 1: Microsoft Word (Intermedio-Avanzado)
-- Computación 2: Microsoft Excel (Básico-Intermedio-Avanzado)
-- Computación 3: IBM SPSS y MS Project
+Finalización y acceso al siguiente nivel:
+Al terminar un nivel, puedes inscribirte en el siguiente realizando el pago y enviando el comprobante a centrodeinformatica@uss.edu.pe. Puedes llevar los niveles en paralelo.
 
-💰 COSTO: S/ 200 por nivel
+---
 
-🏫 MODALIDAD: 100% virtual y de autoaprendizaje mediante Aula USS (www.aulauss.edu.pe). Sin horarios fijos, disponible 24 horas. Puedes completarlo en pocos días según tu disponibilidad.
+CONSTANCIAS:
+Para temas de constancias, contacta directamente al área correspondiente: acempresariales@uss.edu.pe
 
-📱 CONTACTO:
-- Email: centrodeinformatica@uss.edu.pe
-- WhatsApp: 986 724 506
-- Horario de atención presencial: Lunes a Viernes: 8:00 AM - 6:00 PM; Sábados: 8:00 AM - 12:00 PM
+---
 
-OTRAS CONSULTAS:
-- Para temas relacionados con constancias: deriva a acempresariales@uss.edu.pe.
-- Para cambios de horario o cruces con el curso de Computación (ej. semana 6 en adelante): informa que no es posible y deriva a paccis@uss.edu.pe para apoyo del docente.
+CAMBIO DE HORARIO POR CRUCE DE COMPUTACIÓN:
+Si ya estás en la semana 6 del curso, no es posible realizar cambios de horario. Comunícate con tu docente para apoyo y facilidades. Para información adicional, contacta a paccis@uss.edu.pe (este correo solo brinda información general).
 
-RESPUESTAS SEGÚN ELIGIBILIDAD:
-- Si el ciclo es 2024-1 o posterior: "Lamento informarte que el Programa de Computación para Egresados está disponible únicamente para egresados hasta el ciclo 2023-2. Te sugiero contactar a tu Escuela Profesional para conocer las alternativas disponibles."
-- Si es elegible: Procede con el registro normal, invitando al programa: "Hola 👋 Si aún no has acreditado el curso de Computación para Egresados, esta es tu oportunidad para hacerlo. El programa es 100% virtual y de autoaprendizaje... [detalles completos]."
+---
 
-INFORMACIÓN ADICIONAL PARA CONFIRMACIONES:
-- Confirmación de registro: "Hola 👋, confirmamos que ya has sido registrado(a) en el Aula USS... [detalles]."
-- Finalización de curso: "Hola 👋, felicitaciones por concluir... [pasos para siguiente nivel]."
+PERSONALIDAD Y RESPUESTAS:
+- Sé profesional, amigable y claro.
+- Usa emojis apropiados.
+- Proporciona información específica y útil.
+- Solo deriva al contacto oficial si no puedes resolver la consulta.`;
 
-INSTRUCCIONES:
-- Sé amable pero claro sobre los requisitos.
-- Verifica SIEMPRE el ciclo de egreso antes de proceder.
-- No des información de pago a estudiantes no elegibles.
-- Usa emojis y formato amigable en respuestas.
-- Siempre incluye invitación inicial si procede.
-`;
-
-// Ruta principal
-app.get('/', (req, res) => {
-  res.json({ 
-    message: 'API del Chatbot USS - Centro de Informática',
-    timestamp: new Date().toISOString(),
-    version: 'v2.1 - Programa Computación con info actualizada'
-  });
-});
-
-// Endpoint principal del chat
 app.post('/api/chat', async (req, res) => {
   try {
     const { message, sessionId = 'default' } = req.body;
@@ -143,22 +121,15 @@ app.post('/api/chat', async (req, res) => {
       return res.status(400).json({ error: 'Mensaje requerido' });
     }
 
-    console.log(`📩 Consulta recibida - Sesión: ${sessionId}`);
-    console.log(`💬 Mensaje: ${message}`);
-
-    // Extraer datos del mensaje
+    // Extraer datos del estudiante del mensaje actual
     const extractedData = extractStudentData(message);
-    
-    // Obtener datos previos de la sesión
     let currentData = studentData.get(sessionId) || {};
-    Object.assign(currentData, extractedData);
+    currentData = { ...currentData, ...extractedData };
+    currentData.lastActivity = Date.now();
     studentData.set(sessionId, currentData);
 
-    console.log('📊 Datos del estudiante:', currentData);
-
-    // Crear contexto específico basado en los datos
+    // Determinar contexto adicional basado en elegibilidad
     let additionalContext = '';
-    
     if (currentData.ciclo && currentData.elegible === false) {
       additionalContext = `
       ATENCIÓN: El estudiante indicó que egresó en ${currentData.ciclo}.
