@@ -1,7 +1,7 @@
 const studentSessions = new Map();
 const studentData = new Map();
 
-// Función para extraer datos del estudiante
+// Función para extraer datos del estudiante (sin cambios)
 function extractStudentData(message) {
   const data = {};
   const issues = [];
@@ -48,7 +48,7 @@ function extractStudentData(message) {
   return data;
 }
 
-// Configuración del contexto del Centro de Informática USS
+// Configuración del contexto del Centro de Informática USS (sin cambios)
 const SYSTEM_CONTEXT = `Eres un asistente virtual del Centro de Informática de la Universidad Señor de Sipán (USS) en Chiclayo, Perú. Tu objetivo es ayudar al estudiante de manera natural y resolutiva, usando la información oficial y los mensajes institucionales. Solo deriva al contacto oficial si la consulta es demasiado específica o no puedes resolverla.
 
 IMPORTANTE: El Programa de Computación para Egresados es para TODOS los egresados de pregrado de CUALQUIER carrera que tengan pendiente la acreditación de cursos de computación. NO menciones específicamente "Ingeniería de Sistemas" u otras carreras individuales; mantén el enfoque general para todas las carreras de pregrado.
@@ -112,7 +112,7 @@ RESPUESTAS:
 - Mantén un tono profesional pero cercano`;
 
 export default async function handler(req, res) {
-  // Configurar CORS
+  // Configurar CORS (sin cambios)
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -134,14 +134,14 @@ export default async function handler(req, res) {
 
     console.log('📩 Consulta recibida:', { sessionId, message: message.substring(0, 100) });
 
-    // Extraer datos del estudiante del mensaje actual
+    // Extraer datos del estudiante del mensaje actual (sin cambios)
     const extractedData = extractStudentData(message);
     let currentData = studentData.get(sessionId) || {};
     currentData = { ...currentData, ...extractedData };
     currentData.lastActivity = Date.now();
     studentData.set(sessionId, currentData);
 
-    // Determinar contexto adicional basado en elegibilidad
+    // Determinar contexto adicional basado en elegibilidad (sin cambios)
     let additionalContext = '';
     if (currentData.ciclo && currentData.elegible === false) {
       additionalContext = `
@@ -157,7 +157,7 @@ export default async function handler(req, res) {
       `;
     }
 
-    // Verificar API key de Gemini
+    // Verificar API key de Gemini (sin cambios)
     if (!process.env.GEMINI_API_KEY) {
       console.log('❌ GEMINI_API_KEY no configurada');
       return res.status(500).json({ 
@@ -166,7 +166,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // Obtener historial de sesión
+    // Obtener historial de sesión (sin cambios)
     let sessionHistory = studentSessions.get(sessionId) || [];
     
     // Agregar mensaje actual al historial
@@ -175,7 +175,7 @@ export default async function handler(req, res) {
       content: message
     });
 
-    // Modelos a probar en orden
+    // Modelos a probar en orden (sin cambios, válidos en 2025)
     const modelsToTry = [
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent',
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
@@ -204,10 +204,10 @@ export default async function handler(req, res) {
                 ]
               }
             ],
-                   generationConfig: {
-                    temperature: 0.6,
-                    maxOutputTokens: 768
-                   }
+            generationConfig: {
+              temperature: 0.6,
+              maxOutputTokens: 768
+            }
           })
         });
 
@@ -219,7 +219,13 @@ export default async function handler(req, res) {
         }
 
         const data = await response.json();
-        if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+        // ← FIX: Chequeo completo para evitar crash si no hay parts/text
+        if (data.candidates && 
+            data.candidates[0] && 
+            data.candidates[0].content && 
+            data.candidates[0].content.parts && 
+            data.candidates[0].content.parts[0] && 
+            data.candidates[0].content.parts[0].text) {
           botResponse = data.candidates[0].content.parts[0].text;
           console.log(`✅ Respuesta recibida del modelo: ${modelUrl}`);
           break; // Salir del ciclo si funciona
@@ -240,7 +246,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // Agregar respuesta del bot al historial
+    // Agregar respuesta del bot al historial (sin cambios)
     sessionHistory.push({
       role: 'assistant',
       content: botResponse
