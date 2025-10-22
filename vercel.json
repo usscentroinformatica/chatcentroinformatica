@@ -1,9 +1,20 @@
 {
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
+  "functions": {
+    "api/chat.js": {
+      "runtime": "nodejs20.x",
+      "maxDuration": 30,
+      "memory": 1024
     },
+    "api/check-eligibility.js": {
+      "runtime": "nodejs20.x",
+      "maxDuration": 10
+    },
+    "api/clear-session.js": {
+      "runtime": "nodejs20.x",
+      "maxDuration": 10
+    }
+  },
+  "rewrites": [
     {
       "source": "/(.*)",
       "destination": "/index.html"
