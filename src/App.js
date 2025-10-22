@@ -95,44 +95,51 @@ function App() {
   };
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  if (!input.trim() || isLoading) return;
 
-    const userMessage = { type: 'user', text: input };
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setIsLoading(true);
+  const userMessage = { type: 'user', text: input };
+  setMessages(prev => [...prev, userMessage]);
+  setInput('');
+  setIsLoading(true);
 
-    try {
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          message: input,
-          sessionId: sessionId
-        }),
-      });
+  try {
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ 
+        message: input,
+        sessionId: sessionId
+      }),
+    });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        const botMessage = { type: 'bot', text: data.response };
-        setMessages(prev => [...prev, botMessage]);
-      } else {
-        throw new Error(data.error || 'Error en la respuesta');
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      const errorMessage = { 
-        type: 'bot', 
-        text: 'Lo siento, hubo un problema al procesar tu consulta.\n\nContacta a:\n📧 centrodeinformatica@uss.edu.pe\n📱 986 724 506' 
-      };
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
+    // ✅ NUEVO: Verifica el status antes de parsear
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error del servidor:', errorText);
+      throw new Error(`Error ${response.status}: El servidor tuvo un problema`);
     }
-  };
+
+    const data = await response.json();
+
+    if (data.response) {
+      const botMessage = { type: 'bot', text: data.response };
+      setMessages(prev => [...prev, botMessage]);
+    } else {
+      throw new Error(data.error || 'Error en la respuesta');
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    const errorMessage = { 
+      type: 'bot', 
+      text: 'Lo siento, hubo un problema al procesar tu consulta.\n\nContacta a:\n📧 centrodeinformatica@uss.edu.pe\n📱 986 724 506' 
+    };
+    setMessages(prev => [...prev, errorMessage]);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
