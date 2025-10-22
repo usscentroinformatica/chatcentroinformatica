@@ -1,17 +1,9 @@
 {
   "functions": {
     "api/chat.js": {
-      "runtime": "nodejs20.x",
+      "runtime": "nodejs22.x",
       "maxDuration": 30,
       "memory": 1024
-    },
-    "api/check-eligibility.js": {
-      "runtime": "nodejs20.x",
-      "maxDuration": 10
-    },
-    "api/clear-session.js": {
-      "runtime": "nodejs20.x",
-      "maxDuration": 10
     }
   },
   "rewrites": [
