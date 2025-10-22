@@ -1,0 +1,20 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Antenas laterales -->
+  <ellipse cx="14" cy="18" rx="3" ry="7" fill="#90CAF9" stroke="#2196F3" stroke-width="1.5"/>
+  <ellipse cx="50" cy="18" rx="3" ry="7" fill="#90CAF9" stroke="#2196F3" stroke-width="1.5"/>
+  <!-- Cabeza cuadrada con efecto 3D -->
+  <rect x="10" y="14" width="44" height="34" rx="12" fill="#F4F8FB" stroke="#2196F3" stroke-width="2"/>
+  <ellipse cx="32" cy="48" rx="14" ry="6" fill="#B3E5FC" opacity="0.5"/>
+  <!-- Pantalla negra con borde azul -->
+  <rect x="18" y="22" width="28" height="18" rx="7" fill="#222" stroke="#00BFFF" stroke-width="2"/>
+  <!-- Ojos azules brillantes -->
+  <ellipse cx="26" cy="31" rx="3" ry="4" fill="#00BFFF"/>
+  <ellipse cx="38" cy="31" rx="3" ry="4" fill="#00BFFF"/>
+  <!-- Reflejo en los ojos -->
+  <ellipse cx="27" cy="29" rx="1" ry="1.5" fill="#B3E5FC" opacity="0.8"/>
+  <ellipse cx="39" cy="29" rx="1" ry="1.5" fill="#B3E5FC" opacity="0.8"/>
+  <!-- Sonrisa amigable -->
+  <path d="M28 38 Q32 42 36 38" stroke="#00BFFF" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <!-- Brillo en la cabeza -->
+  <ellipse cx="22" cy="22" rx="6" ry="2" fill="#fff" opacity="0.3"/>
+</svg>

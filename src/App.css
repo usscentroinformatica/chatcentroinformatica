@@ -1,0 +1,103 @@
+.App {
+  text-align: center;
+}
+
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Animaciones personalizadas para Camilito */
+/* Scrollbar personalizado solo para el área de mensajes del chatbot */
+.chat-messages::-webkit-scrollbar {
+  width: 10px;
+  background: #232946;
+}
+.chat-messages::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #0057b8 0%, #00c2cb 100%);
+  border-radius: 8px;
+}
+.chat-messages::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #00c2cb 0%, #0057b8 100%);
+}
+.chat-messages::-webkit-scrollbar-track {
+  background: #eebbc3;
+  border-radius: 8px;
+}
+/* Para Firefox */
+.chat-messages {
+  scrollbar-width: thin;
+  scrollbar-color: #00c2cb #eebbc3;
+}
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeInUp {
+  animation: fadeInUp 0.8s ease-out forwards;
+}
+
+.animation-delay-300 {
+  animation-delay: 0.3s;
+}
+
+.animation-delay-500 {
+  animation-delay: 0.5s;
+}
+
+.animation-delay-700 {
+  animation-delay: 0.7s;
+}
+
+/* Efecto de brillo para el bot */
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  background-size: 200px 100%;
+  animation: shimmer 2s infinite;
+}
