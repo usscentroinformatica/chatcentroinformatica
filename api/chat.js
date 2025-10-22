@@ -13,10 +13,12 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware (MEJORADO: CORS configurado para local - permite localhost:3000)
 app.use(cors({
-  origin: 'http://localhost:3000',  // Permite solo tu frontend local
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],  // Incluye OPTIONS para preflight
-  allowedHeaders: ['Content-Type', 'Authorization'],  // Headers comunes
-  credentials: true  // Si usas cookies/auth en futuro
+  origin: process.env.NODE_ENV === 'production' 
+    ? 'https://chatcentroinformatica.vercel.app'  // Tu domain de Vercel (ajusta si cambia)
+    : 'http://localhost:3000',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 }));
 app.use(express.json());  // Para parsear JSON en requests
 
@@ -27,14 +29,13 @@ const studentData = new Map();
 // Contenido del PDF (se cargará al inicio)
 let pdfContent = '';
 
-// Función para cargar y analizar el PDF al inicio del servidor
+// Función para cargar y analizar el PDF al inicio del servidor (VERSIÓN MEJORADA PARA VERCEL)
+// Embed del fallback como default para evitar issues con fs en serverless. Solo usa fs en local si el archivo existe.
 async function loadPdfContent() {
   const pdfPath = './Guía Programa de Computación Egresados V2.pdf'; // Ajusta si el nombre exacto varía
-  
-  if (!fs.existsSync(pdfPath)) {
-    console.error('❌ PDF no encontrado:', pdfPath);
-    // Fallback: Usar el contenido proporcionado en el query como texto plano (actualizado con detalles exactos de slides/imágenes y nuevo texto proporcionado)
-    pdfContent = `PROGRAMA COMPUTACION PARA EGRESADOS
+
+  // Default: Usa el contenido embebido (fallback completo) – optimizado para producción (Vercel)
+  pdfContent = `PROGRAMA COMPUTACION PARA EGRESADOS
 
 COMPUTACIÓN PARA EGRESADOS
 
@@ -112,38 +113,42 @@ EVALUACIÓN: PROMEDIO = (C1 + C2 + C3 + C4)/4 (4 cuestionarios, cada uno de 30 m
 GRACIAS 986 724 506 centrodeinformatica@uss.edu.pe PROGRAMA DE COMPUTACIÓN PARA EGRESADOS
 
 INFORMACIÓN EXTRA: Deudas pendientes no afectan inscripción (independiente). Olvidé usuario/contraseña Campus/Aula: Contacta ciso.dti@uss.edu.pe o helpdesk1@uss.edu.pe. Constancias: acempresariales@uss.edu.pe. Cambio horarios: paccis@uss.edu.pe con pruebas.`;
-    console.log('✅ Usando fallback del contenido PDF actualizado con slides exactos (números en círculo) y nuevo texto proporcionado.');
-    return;
-  }
+  
+  console.log('✅ Usando contenido embebido del PDF (optimizado para Vercel/prod).');
 
-  let parser = null;
-  try {
-    const dataBuffer = fs.readFileSync(pdfPath);
-    parser = new PDFParse({ data: dataBuffer }); // CORREGIDO: { data: buffer } en lugar de { buffer: dataBuffer }
-    const pdfData = await parser.getText(); // Extrae el objeto con .text
-    pdfContent = pdfData.text; // Accede a .text
-    console.log('✅ PDF cargado y analizado. Longitud del texto:', pdfContent.length);
-    
-    // Opcional: Resumir si es muy largo para el prompt (límite ~4000 tokens ~8000 chars)
-    if (pdfContent.length > 8000) {
-      pdfContent = pdfContent.substring(0, 8000) + '\n\n[Texto truncado: El PDF completo incluye guías detalladas de inscripción, contenidos de cursos y evaluaciones. Usa secciones clave para responder.]';
-      console.log('📝 PDF resumido para optimizar contexto de IA.');
+  // Opcional: En desarrollo local, intenta cargar el PDF real si existe (para testing)
+  if (process.env.NODE_ENV !== 'production' && fs.existsSync(pdfPath)) {
+    let parser = null;
+    try {
+      const dataBuffer = fs.readFileSync(pdfPath);
+      parser = new PDFParse({ data: dataBuffer });
+      const pdfData = await parser.getText();
+      pdfContent = pdfData.text;
+      console.log('✅ PDF cargado desde archivo local. Longitud del texto:', pdfContent.length);
+      
+      // Resumir si es muy largo para el prompt (límite ~4000 tokens ~8000 chars)
+      if (pdfContent.length > 8000) {
+        pdfContent = pdfContent.substring(0, 8000) + '\n\n[Texto truncado: El PDF completo incluye guías detalladas de inscripción, contenidos de cursos y evaluaciones. Usa secciones clave para responder.]';
+        console.log('📝 PDF resumido para optimizar contexto de IA.');
+      }
+      
+      // Extraer secciones clave para mejorar "aprendizaje" (ej. FAQs o resúmenes)
+      const keySections = {
+        cursos: pdfContent.match(/Computación \d+.*?S\/200/gmi) || [],
+        inscripcion: pdfContent.match(/Proceso de Registro|Inscripción.*?comprobante/gmi) || [],
+        evaluacion: pdfContent.match(/Evaluación|Cuestionarios.*?promedio/gmi) || []
+      };
+      console.log('🔑 Secciones clave extraídas:', Object.keys(keySections).filter(k => keySections[k].length > 0));
+    } catch (err) {
+      console.error('❌ Error al procesar PDF local:', err.message);
+      // Mantiene el embed como fallback
+    } finally {
+      if (parser) {
+        await parser.destroy(); // Liberar memoria
+      }
     }
-    
-    // Extraer secciones clave para mejorar "aprendizaje" (ej. FAQs o resúmenes)
-    const keySections = {
-      cursos: pdfContent.match(/Computación \d+.*?S\/200/gmi) || [],
-      inscripcion: pdfContent.match(/Proceso de Registro|Inscripción.*?comprobante/gmi) || [],
-      evaluacion: pdfContent.match(/Evaluación|Cuestionarios.*?promedio/gmi) || []
-    };
-    console.log('🔑 Secciones clave extraídas:', Object.keys(keySections).filter(k => keySections[k].length > 0));
-  } catch (err) {
-    console.error('❌ Error al procesar PDF:', err.message);
-    pdfContent = 'Error en PDF: Usar info base del programa.';
-  } finally {
-    if (parser) {
-      await parser.destroy(); // Liberar memoria
-    }
+  } else if (process.env.NODE_ENV !== 'production') {
+    console.log('ℹ️  En desarrollo: PDF no encontrado en', pdfPath, '– usando embed.');
   }
 }
 
