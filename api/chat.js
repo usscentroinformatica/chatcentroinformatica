@@ -1,3 +1,163 @@
+// Servidor Express para el Chatbot USS - Centro de Informática
+const express = require('express');
+const cors = require('cors');
+require('dotenv').config();
+const fetch = require('node-fetch');
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type'],
+}));
+app.use(express.json());
+// const studentSessions = new Map();
+// const studentData = new Map();
+
+function extractStudentData(message) {
+  const data = {};
+  const issues = [];
+  // Extraer nombre
+  const nombreMatch = message.match(/(?:mi nombre es|me llamo|soy)\s+([a-záéíóúüñ\s]+?)(?:,|\s+\d{4}|$)/i);
+  if (nombreMatch && nombreMatch[1].trim().split(' ').length >= 2) {
+    data.nombre = nombreMatch[1].trim();
+  }
+  // Extraer ciclo
+  const cicloMatch = message.match(/(\d{4}-[12])/);
+  if (cicloMatch) {
+    data.ciclo = cicloMatch[1];
+  const [year, semester] = data.ciclo.split('-');
+  const yearNum = parseInt(year);
+  const semesterNum = parseInt(semester);
+    if (yearNum > 2023 || (yearNum === 2023 && semesterNum > 2)) {
+      issues.push('ciclo_no_elegible');
+      data.elegible = false;
+    } else {
+      data.elegible = true;
+    }
+  }
+  // Extraer curso aprobado
+  const cursoMatch = message.match(/(?:computaci[óo]n|comp)\s*([123]|ninguno)/i);
+  if (cursoMatch) {
+    data.ultimoCurso = cursoMatch[1] === 'ninguno' ? 'ninguno' : `Computación ${cursoMatch[1]}`;
+  }
+  // Extraer correo
+  const correoMatch = message.match(/([a-zA-Z0-9._%+-]+@(?:uss\.edu\.pe|crece\.uss\.edu\.pe))/i);
+  if (correoMatch) {
+    data.correo = correoMatch[1].toLowerCase();
+  }
+  if (issues.length > 0) {
+    data.issues = issues;
+  }
+  return data;
+}
+
+// const SYSTEM_CONTEXT = ... (duplicated, remove this block)
+
+app.post('/api/chat', async (req, res) => {
+  try {
+    const { message, sessionId = 'default' } = req.body;
+    if (!message) {
+      return res.status(400).json({ error: 'Mensaje requerido' });
+    }
+    // Extraer datos del estudiante
+  const extractedData = extractStudentData(message);
+  let currentData = studentData.get(sessionId) || {};
+  currentData = { ...currentData, ...extractedData };
+  currentData.lastActivity = Date.now();
+  studentData.set(sessionId, currentData);
+
+  // Determinar contexto adicional
+    let additionalContext = '';
+    if (currentData.ciclo && currentData.elegible === false) {
+      additionalContext = `ATENCIÓN: El estudiante indicó que egresó en ${currentData.ciclo}. Este ciclo NO ES ELEGIBLE para el programa (posterior a 2023-2). Debes informarle amablemente que no puede acceder al programa y sugerir alternativas. NO continues con el proceso de inscripción.`;
+    } else if (currentData.ciclo && currentData.elegible === true) {
+      additionalContext = `El estudiante egresó en ${currentData.ciclo} - ES ELEGIBLE para el programa. Puedes continuar con el proceso de inscripción, incluyendo invitación y detalles completos.`;
+    }
+
+    // Verificar API key
+    if (!process.env.GEMINI_API_KEY) {
+      console.log('❌ GEMINI_API_KEY no configurada');
+      return res.status(500).json({ 
+        error: 'API key no configurada',
+        response: 'Lo siento, hay un problema de configuración. Contacta a centrodeinformatica@uss.edu.pe o llama al 986 724 506.'
+      });
+    }
+
+    // Obtener historial de sesión
+  let sessionHistory = studentSessions.get(sessionId) || [];
+  sessionHistory.push({ role: 'user', content: message });
+
+  // Modelos Gemini
+    const modelsToTry = [
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent',
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent',
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent'
+  ];
+
+  let botResponse = '';
+    let lastError = null;
+    for (const modelUrl of modelsToTry) {
+      try {
+        const response = await fetch(`${modelUrl}?key=${process.env.GEMINI_API_KEY}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              { parts: [ { text: `Contexto del sistema: ${SYSTEM_CONTEXT}\n\n${additionalContext}\n\nDatos actuales del estudiante: ${JSON.stringify(currentData)}\n\nHistorial de conversación:\n${sessionHistory.map(msg => `${msg.role}: ${msg.content}`).join('\n')}\n\nResponde como asistente del Centro de Informática USS:` } ] }
+            ],
+            generationConfig: { temperature: 0.6, maxOutputTokens: 768 }
+          })
+        });
+        if (!response.ok) {
+          const errorData = await response.text();
+          lastError = `Error de Gemini API: ${response.status} - ${errorData}`;
+          continue;
+        }
+        const data = await response.json();
+        if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) {
+          botResponse = data.candidates[0].content.parts[0].text;
+          break;
+        } else {
+          lastError = 'Respuesta inválida de Gemini';
+        }
+      } catch (geminiError) {
+        lastError = geminiError.message;
+      }
+    }
+
+    if (!botResponse) {
+      return res.status(500).json({
+        error: lastError || 'No se pudo obtener respuesta de ningún modelo Gemini',
+        response: 'Error temporal con el servicio de IA. Por favor intenta nuevamente o contacta al administrador.'
+      });
+    }
+
+    sessionHistory.push({ role: 'assistant', content: botResponse });
+    if (sessionHistory.length > 20) {
+      sessionHistory = sessionHistory.slice(-20);
+    }
+  studentSessions.set(sessionId, sessionHistory);
+
+  return res.status(200).json({ 
+  response: botResponse,
+  sessionId: sessionId,
+  studentData: currentData,
+      isEligible: currentData.elegible !== false
+    });
+  } catch (error) {
+    console.error('❌ Error en el servidor:', error);
+    return res.status(500).json({ error: 'Error interno del servidor', response: 'Lo siento, hubo un problema técnico. Por favor contacta a:\n📧 centrodeinformatica@uss.edu.pe\n📱 986 724 506' });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Servidor chatbot USS escuchando en puerto ${PORT}`);
+});
 const studentSessions = new Map();
 const studentData = new Map();
 
@@ -113,6 +273,7 @@ RESPUESTAS:
 
 export default async function handler(req, res) {
   // Configurar CORS (sin cambios)
+  console.log('GEMINI_API_KEY:', process.env.GEMINI_API_KEY);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
