@@ -1,77 +1,10 @@
 // /api/chat.js - Serverless function para Vercel (Node.js)
 const fetch = require('node-fetch');
 require('dotenv').config();
-const admin = require('firebase-admin');  // Para FieldValue.serverTimestamp
+const admin = require('firebase-admin');  // Para FieldValue
 const db = require('../firebase');  // Tu firebase.js (Admin SDK)
 
-// Variables in-memory para sesiones (fallback si Firebase falla, pero usa FS principal)
-const conversationHistory = new Map();
-
-// SYSTEM_CONTEXT completo (del original)
-const SYSTEM_CONTEXT = `Eres un asistente virtual del Centro de Informática USS en Chiclayo, Perú. Ayuda SOLO con el Programa de Computación para Egresados: sé preciso, corto y enfocado en la pregunta. ANALIZA el PDF proporcionado para responder con info exacta (ej. contenidos específicos de cursos, pasos detallados de inscripción y pago con números en círculo). Si es consulta general, lista cursos y costos upfront, explica pago/registro brevemente, y pregunta ciclo/nombre SOLO si quieren inscribirse. Usa info del PDF como fuente principal. NO textos largos; 100-200 palabras max. Al final de cada respuesta, agrega: "Para más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinformatica@uss.edu.pe".
-
-IMPORTANTE: 
-- EXCLUSIVO para egresados pregrado hasta 2023-2 con pendiente en computación.
-- Si ciclo > 2023-2: No elegible, redirige a paccis@uss.edu.pe.
-- Deudas pendientes: No afectan inscripción; el programa es independiente de malla curricular.
-- Olvidé usuario/contraseña Campus/Aula USS: Redirige a ciso.dti@uss.edu.pe o helpdesk1@uss.edu.pe.
-- Constancias: Redirige a acempresariales@uss.edu.pe.
-- Cambios horario/académicos: Redirige a paccis@uss.edu.pe (adjunta pruebas; revisa horarios para evitar cruces).
-- NO info de otros servicios.
-
-CONTENIDO DEL PDF "Guía Programa de Computación Egresados V2": ${pdfContent} [Usa SOLO esto para analizar y responder preguntas específicas, como detalles de módulos o evaluaciones. Si no está en PDF, usa info base abajo].
-
-INFO BASE DEL PROGRAMA (EXACTA del PDF/slides con números en círculo y nuevo texto):
-- Dirigido a: Egresados pregrado USS hasta 2023-2 con pendiente acreditación en cursos de computación.
-- Modalidad: 100% virtual (Aula USS: www.aulauss.edu.pe), autoaprendizaje, 24/7, sin horarios fijos.
-- LISTA DE CURSOS (siempre prominentemente en info general):
-  📚 Computación 1: Microsoft Word (Intermedio - Avanzado) - S/ 200
-  📚 Computación 2: Microsoft Excel (Básico - Intermedio - Avanzado) - S/ 200
-  📚 Computación 3: IBM SPSS y MS Project - S/ 200
-- Proceso de Registro (EXACTO de slides con números en círculo y nuevo texto):
-  Ingresa al campus USS:
-  1. Trámites.
-  2. PROGRAMACION DE SERVICIOS
-  3. PROGRAMA DE COMPUTACIÓN PARA EGRESADOS USS
-  4. Programar
-  5. Realizar el pago correspondiente.
-  6. Enviar comprobante de pago para registro a: centrodeinformatica@uss.edu.pe
-  - Nota: Usa credenciales existentes. Una vez registrado y pagado, accede al Aula USS. Niveles en paralelo OK. Completa antes 31/12.
-- Formas de Pago (EXACTAS de slides con iconos y nuevo texto):
-  1. Pagos con tarjeta - QR
-  2. Activar el check "He leído y estoy de acuerdo con las condiciones...
-  3. Yape - selecciona servicios programables ingresa el código de alumno.
-  4. Aplicativo BCP - Seleccionar Pagar servicios, en seleccionar servicios le coloca "Servicios Programables".. ingresa el código de alumno..
-  5. En cualquier agente o agencia del BCP (en caso soliciten número de cuenta: 305-1552328-0-87)
-  Desde la aplicación o agencia BCP la programación se reflejará entre 3 a 5 horas.
-  Desde agente BCP, se debe esperar hasta 24 horas para que se visualice la programación.
-  💳 Métodos de Pago:
-  - Campus Virtual – Gestión Financiera: Pago online con Visa o MasterCard, Pago con billetera digital / QR.
-  - Yape: Ingresando tu código de alumno.
-  - Aplicativo BCP: Seleccionar "Servicios Programables", Ingresar tu código de alumno.
-  - Agente o Agencia BCP: Número de cuenta: 305-1552328-0-87. Nota: Desde app/agencia: 3 a 5 horas. Desde agente físico: hasta 24 horas.
-  - Campus Virtual: Accede a Gestión Financiera > Detalle Económico > Pagos con Tarjeta QR (VISA/Mastercard).
-  - Yape: Paga el servicio programado vía app Yape (ingresa código del alumno).
-  - Aplicativo BCP: Paga servicios > "Servicios Programados" > Ingresa código > Refleja en 3-5 horas.
-  - Agente o Agencia BCP: En cualquier agente/agencia BCP (cuenta: 305-1552328-0-87). Espera hasta 24 horas.
-- Metodología (con números en círculo y nuevo texto): 📚 Metodología del Curso: Aula USS (www.aulauss.edu.pe), Material de autoaprendizaje PDFs y recursos en línea, 100% virtual Acceso 24/7, Cuestionarios evaluaciones progresivas (4 cuestionarios, 30 min cada uno), Promedio = (C1 + C2 + C3 + C4)/4. 1. Aula USS. 2. 100% Virtual (24/7). 3. Material Autoaprendizaje. 4. Cuestionarios.
-- Materiales: Sílabo, Material PDF, Cuestionarios.
-- Evaluación: Promedio = (C1 + C2 + C3 + C4)/4 (4 cuestionarios, cada uno de 30 minutos; Cuestionario 1 -> C1, etc.).
-- Contactos: centrodeinformatica@uss.edu.pe | 986 724 506 | @centrodeinformaticauss (IG), Centro de Informática USS (FB/LinkedIn). Sigue para eventos.
-
-EJEMPLOS CORTOS (basados en PDF/slides con números):
-- Invitación: "¡Hola! 👋 Programa 100% virtual para egresados hasta 2023-2. 📚 Cursos: 1-Word (Int-Av) S/200; 2-Excel (Bás-Int-Av) S/200; 3-SPSS/Project S/200. Registro: Ingresa Campus > 1. Trámites > 2. Programación Servicios > 3. Programa Computación Egresados USS > 4. Programar > 5. Paga > 6. Envía comprobante a centrodeinformatica@uss.edu.pe. ¿Tu ciclo? 📞 986 724 506."
-- Pagos: "💳 Pasos pagos: 1. Tarjeta QR (activa check condiciones). 2. Yape (servicios programables, código alumno). 3. BCP App (Pagar servicios > Programables, código). 4. Agente BCP (cta 305-1552328-0-87, 24h). App/agencia: 3-5h. 📧 centrodeinformatica@uss.edu.pe."
-- Inscripción: "Pasos registro: 1. Campus > Trámites. 2. Programación Servicios. 3. Programa Computación Egresados USS. 4. Programar (S/200). 5. Paga. 6. Envía comprobante. 📞 986 724 506."
-- Evaluación: "Evaluación: 4 cuestionarios (30 min cada uno), promedio (C1+C2+C3+C4)/4. 📧 centrodeinformatica@uss.edu.pe."
-- Deudas: "¡No hay problema! 😊 El programa es independiente; deudas de malla no afectan. Sigue pasos de registro. 📧 centrodeinformatica@uss.edu.pe."
-- Credenciales: "Para recuperar usuario/contraseña, contacta ciso.dti@uss.edu.pe o helpdesk1@uss.edu.pe. 📞 986 724 506."
-- Constancias: "Para constancias, contacta acempresariales@uss.edu.pe. 📞 986 724 506."
-- Cambios: "Para cambio de horarios, envía solicitud con pruebas a paccis@uss.edu.pe. Revisa para evitar cruces. 📧 centrodeinformatica@uss.edu.pe."
-
-PERSONALIDAD: Profesional, amigable, emojis. Responde en español. Mantén conversaciones naturales y fluidas, sin repetir información ya dada en el historial.`;
-
-// Contenido PDF hardcodeado (del original)
+// Contenido PDF hardcodeado (MOVIDO ARRIBA para evitar ReferenceError)
 const pdfContent = `PROGRAMA COMPUTACION PARA EGRESADOS
 
 COMPUTACIÓN PARA EGRESADOS
@@ -150,6 +83,73 @@ EVALUACIÓN: PROMEDIO = (C1 + C2 + C3 + C4)/4 (4 cuestionarios, cada uno de 30 m
 GRACIAS 986 724 506 centrodeinformatica@uss.edu.pe PROGRAMA DE COMPUTACIÓN PARA EGRESADOS
 
 INFORMACIÓN EXTRA: Deudas pendientes no afectan inscripción (independiente). Olvidé usuario/contraseña Campus/Aula: Contacta ciso.dti@uss.edu.pe o helpdesk1@uss.edu.pe. Constancias: acempresariales@uss.edu.pe. Cambio horarios: paccis@uss.edu.pe con pruebas.`;
+
+// SYSTEM_CONTEXT (ahora usa pdfContent definido arriba)
+const SYSTEM_CONTEXT = `Eres un asistente virtual del Centro de Informática USS en Chiclayo, Perú. Ayuda SOLO con el Programa de Computación para Egresados: sé preciso, corto y enfocado en la pregunta. ANALIZA el PDF proporcionado para responder con info exacta (ej. contenidos específicos de cursos, pasos detallados de inscripción y pago con números en círculo). Si es consulta general, lista cursos y costos upfront, explica pago/registro brevemente, y pregunta ciclo/nombre SOLO si quieren inscribirse. Usa info del PDF como fuente principal. NO textos largos; 100-200 palabras max. Al final de cada respuesta, agrega: "Para más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinformatica@uss.edu.pe".
+
+IMPORTANTE: 
+- EXCLUSIVO para egresados pregrado hasta 2023-2 con pendiente en computación.
+- Si ciclo > 2023-2: No elegible, redirige a paccis@uss.edu.pe.
+- Deudas pendientes: No afectan inscripción; el programa es independiente de malla curricular.
+- Olvidé usuario/contraseña Campus/Aula USS: Redirige a ciso.dti@uss.edu.pe o helpdesk1@uss.edu.pe.
+- Constancias: Redirige a acempresariales@uss.edu.pe.
+- Cambios horario/académicos: Redirige a paccis@uss.edu.pe (adjunta pruebas; revisa horarios para evitar cruces).
+- NO info de otros servicios.
+
+CONTENIDO DEL PDF "Guía Programa de Computación Egresados V2": ${pdfContent} [Usa SOLO esto para analizar y responder preguntas específicas, como detalles de módulos o evaluaciones. Si no está en PDF, usa info base abajo].
+
+INFO BASE DEL PROGRAMA (EXACTA del PDF/slides con números en círculo y nuevo texto):
+- Dirigido a: Egresados pregrado USS hasta 2023-2 con pendiente acreditación en cursos de computación.
+- Modalidad: 100% virtual (Aula USS: www.aulauss.edu.pe), autoaprendizaje, 24/7, sin horarios fijos.
+- LISTA DE CURSOS (siempre prominentemente en info general):
+  📚 Computación 1: Microsoft Word (Intermedio - Avanzado) - S/ 200
+  📚 Computación 2: Microsoft Excel (Básico - Intermedio - Avanzado) - S/ 200
+  📚 Computación 3: IBM SPSS y MS Project - S/ 200
+- Proceso de Registro (EXACTO de slides con números en círculo y nuevo texto):
+  Ingresa al campus USS:
+  1. Trámites.
+  2. PROGRAMACION DE SERVICIOS
+  3. PROGRAMA DE COMPUTACIÓN PARA EGRESADOS USS
+  4. Programar
+  5. Realizar el pago correspondiente.
+  6. Enviar comprobante de pago para registro a: centrodeinformatica@uss.edu.pe
+  - Nota: Usa credenciales existentes. Una vez registrado y pagado, accede al Aula USS. Niveles en paralelo OK. Completa antes 31/12.
+- Formas de Pago (EXACTAS de slides con iconos y nuevo texto):
+  1. Pagos con tarjeta - QR
+  2. Activar el check "He leído y estoy de acuerdo con las condiciones...
+  3. Yape - selecciona servicios programables ingresa el código de alumno.
+  4. Aplicativo BCP - Seleccionar Pagar servicios, en seleccionar servicios le coloca "Servicios Programables".. ingresa el código de alumno..
+  5. En cualquier agente o agencia del BCP (en caso soliciten número de cuenta: 305-1552328-0-87)
+  Desde la aplicación o agencia BCP la programación se reflejará entre 3 a 5 horas.
+  Desde agente BCP, se debe esperar hasta 24 horas para que se visualice la programación.
+  💳 Métodos de Pago:
+  - Campus Virtual – Gestión Financiera: Pago online con Visa o MasterCard, Pago con billetera digital / QR.
+  - Yape: Ingresando tu código de alumno.
+  - Aplicativo BCP: Seleccionar "Servicios Programables", Ingresar tu código de alumno.
+  - Agente o Agencia BCP: Número de cuenta: 305-1552328-0-87. Nota: Desde app/agencia: 3 a 5 horas. Desde agente físico: hasta 24 horas.
+  - Campus Virtual: Accede a Gestión Financiera > Detalle Económico > Pagos con Tarjeta QR (VISA/Mastercard).
+  - Yape: Paga el servicio programado vía app Yape (ingresa código del alumno).
+  - Aplicativo BCP: Paga servicios > "Servicios Programados" > Ingresa código > Refleja en 3-5 horas.
+  - Agente o Agencia BCP: En cualquier agente/agencia BCP (cuenta: 305-1552328-0-87). Espera hasta 24 horas.
+- Metodología (con números en círculo y nuevo texto): 📚 Metodología del Curso: Aula USS (www.aulauss.edu.pe), Material de autoaprendizaje PDFs y recursos en línea, 100% virtual Acceso 24/7, Cuestionarios evaluaciones progresivas (4 cuestionarios, 30 min cada uno), Promedio = (C1 + C2 + C3 + C4)/4. 1. Aula USS. 2. 100% Virtual (24/7). 3. Material Autoaprendizaje. 4. Cuestionarios.
+- Materiales: Sílabo, Material PDF, Cuestionarios.
+- Evaluación: Promedio = (C1 + C2 + C3 + C4)/4 (4 cuestionarios, cada uno de 30 minutos; Cuestionario 1 -> C1, etc.).
+- Contactos: centrodeinformatica@uss.edu.pe | 986 724 506 | @centrodeinformaticauss (IG), Centro de Informática USS (FB/LinkedIn). Sigue para eventos.
+
+EJEMPLOS CORTOS (basados en PDF/slides con números):
+- Invitación: "¡Hola! 👋 Programa 100% virtual para egresados hasta 2023-2. 📚 Cursos: 1-Word (Int-Av) S/200; 2-Excel (Bás-Int-Av) S/200; 3-SPSS/Project S/200. Registro: Ingresa Campus > 1. Trámites > 2. Programación Servicios > 3. Programa Computación Egresados USS > 4. Programar > 5. Paga > 6. Envía comprobante a centrodeinformatica@uss.edu.pe. ¿Tu ciclo? 📞 986 724 506."
+- Pagos: "💳 Pasos pagos: 1. Tarjeta QR (activa check condiciones). 2. Yape (servicios programables, código alumno). 3. BCP App (Pagar servicios > Programables, código). 4. Agente BCP (cta 305-1552328-0-87, 24h). App/agencia: 3-5h. 📧 centrodeinformatica@uss.edu.pe."
+- Inscripción: "Pasos registro: 1. Campus > Trámites. 2. Programación Servicios. 3. Programa Computación Egresados USS. 4. Programar (S/200). 5. Paga. 6. Envía comprobante. 📞 986 724 506."
+- Evaluación: "Evaluación: 4 cuestionarios (30 min cada uno), promedio (C1+C2+C3+C4)/4. 📧 centrodeinformatica@uss.edu.pe."
+- Deudas: "¡No hay problema! 😊 El programa es independiente; deudas de malla no afectan. Sigue pasos de registro. 📧 centrodeinformatica@uss.edu.pe."
+- Credenciales: "Para recuperar usuario/contraseña, contacta ciso.dti@uss.edu.pe o helpdesk1@uss.edu.pe. 📞 986 724 506."
+- Constancias: "Para constancias, contacta acempresariales@uss.edu.pe. 📞 986 724 506."
+- Cambios: "Para cambio de horarios, envía solicitud con pruebas a paccis@uss.edu.pe. Revisa para evitar cruces. 📧 centrodeinformatica@uss.edu.pe."
+
+PERSONALIDAD: Profesional, amigable, emojis. Responde en español. Mantén conversaciones naturales y fluidas, sin repetir información ya dada en el historial.`;
+
+// Variables in-memory para fallback (history)
+const conversationHistory = new Map();
 
 // Función extractStudentData mejorada (con cursos secuenciales)
 function extractStudentData(message) {
@@ -283,7 +283,11 @@ async function saveEstudiante(data) {
     console.log('✅ Egresado guardado:', data.correo);
   } catch (err) {
     console.error('❌ Error save estudiante:', err.message);
-    await db.collection('errors').add({ error: err.message, data, timestamp: new Date() });
+    try {
+      await db.collection('errors').add({ error: err.message, data, timestamp: new Date() });
+    } catch (fallbackErr) {
+      console.error('Fallback error log failed:', fallbackErr);
+    }
   }
 }
 
@@ -340,13 +344,13 @@ module.exports = async (req, res) => {
     if (currentData.ciclo && currentData.elegible === false) {
       additionalContext = `ATENCIÓN: Ciclo ${currentData.ciclo} NO ELEGIBLE (post 2023-2). Informa amablemente y redirige a paccis@uss.edu.pe. Mantén corto.`;
     } else if (currentData.ciclo && currentData.elegible === true) {
-      additionalContext = `Egresado en ${currentData.ciclo} - ELEGIBLE. Si cursoTomado (ej: '2'), responde: "Te falta Computación ${cursoPendiente}: [descripción] S/200". No digas "ya llevaste X", solo enfócate en pendiente. Lista solo cursos pendientes. Si 'ninguno', ofrece desde 1. Usa credenciales existentes.`;
+      additionalContext = `Egresado en ${currentData.ciclo} - ELEGIBLE. Si cursoTomado (ej: '2'), responde: "Te falta Computación ${currentData.cursoPendiente}: [descripción del PDF] S/200". No digas "ya llevaste X", solo enfócate en pendiente. Lista solo cursos pendientes. Si 'ninguno', ofrece desde 1. Usa credenciales existentes.`;
     } else {
       additionalContext = `No ciclo detectado. Lista cursos defrente si general. Pregunta datos solo si inscribir.`;
     }
 
     if (faltan.length === 0 && !currentData.introSent) {
-      additionalContext += `Datos completos. Primera respuesta: Saluda por nombre, confirma elegibilidad, resume pendiente (ej: "Te falta Computación ${cursoPendiente}"), pregunta qué necesita (inscripción, pago).`;
+      additionalContext += `Datos completos. Primera respuesta: Saluda por nombre, confirma elegibilidad, resume pendiente (ej: "Te falta Computación ${currentData.cursoPendiente}"), pregunta qué necesita (inscripción, pago).`;
       currentData.introSent = true;
       await setStudentData(sessionId, currentData);
     } else if (faltan.length > 0 && faltan.length <= 2) {
@@ -400,7 +404,7 @@ module.exports = async (req, res) => {
 
         if (response.ok) {
           const data = await response.json();
-          if (data.candidates && data.candidates[0].content && data.candidates[0].content.parts[0].text) {
+          if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) {
             botResponse = data.candidates[0].content.parts[0].text.trim();
             if (botResponse.length >= 50) break;
           }
@@ -410,13 +414,14 @@ module.exports = async (req, res) => {
       }
     }
 
-    // Fallback si Gemini falla
+    // Fallback si Gemini falla (COMpletado con descripción ejemplo)
     if (!botResponse || botResponse.length < 50) {
       const introSent = currentData.introSent || false;
+      const pendienteDesc = currentData.cursoPendiente === '1' ? 'Microsoft Word (Intermedio - Avanzado)' : currentData.cursoPendiente === '2' ? 'Microsoft Excel (Básico - Intermedio - Avanzado)' : currentData.cursoPendiente === '3' ? 'IBM SPSS y MS Project' : 'ninguno';
       if (introSent) {
-        botResponse = `¡Hola de nuevo! 😊 ¿Qué duda tienes sobre el programa? (Ej: inscripción en Computación ${currentData.cursoPendiente || 1}, pagos).`;
+        botResponse = `¡Hola de nuevo! 😊 ¿Qué duda tienes sobre el programa? (Ej: inscripción en Computación ${currentData.cursoPendiente || 1}: ${pendienteDesc}, pagos).`;
       } else {
-        botResponse = `¡Hola ${currentData.nombre || ''}! 😊 Eres elegible (ciclo ${currentData.ciclo}). Te falta Computación ${currentData.cursoPendiente || 1}: [descripción breve] S/200.\n\nPasos: 1. Campus > Trámites > ... [resumen]. ¿Inscribirte o duda específica?\n\nPara más, 📞 986 724 506.`;
+        botResponse = `¡Hola ${currentData.nombre || ''}! 😊 Eres elegible (ciclo ${currentData.ciclo}). Te falta Computación ${currentData.cursoPendiente || 1}: ${pendienteDesc} (S/200).\n\nPasos: 1. Campus > Trámites > Programación Servicios > Programa Computación Egresados USS > 2. Programar > 3. Paga > 4. Envía comprobante a centrodeinformatica@uss.edu.pe.\n\n¿Inscribirte o duda específica?\n\nPara más, 📞 986 724 506 o 📧 centrodeinformatica@uss.edu.pe.`;
       }
     }
 
@@ -437,7 +442,10 @@ module.exports = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error servidor:', error);
-    return res.status(500).json({ error: 'Error interno', response: '¡Ups! Problema técnico. Contacta 📞 986 724 506.' });
+    console.error('Error servidor completo:', error);  // Log extra para debug
+    return res.status(500).json({ 
+      error: 'Error interno del servidor',
+      response: '¡Ups! Problema técnico temporal. Mientras, info rápida del Programa: 100% virtual para egresados hasta 2023-2. Cursos S/200: Word, Excel, SPSS/Project. Inscríbete: Campus > Trámites > Programación > Programa Egresados > Programar > Paga > Envía a centrodeinformatica@uss.edu.pe. ¿Qué necesitas? 📞 986 724 506.' 
+    });
   }
 };
