@@ -5,7 +5,7 @@
 // Para Firebase, requiere configuración separada (agrega require si usas); aquí se incluye pero comenta si no está listo.
 const fetch = require('node-fetch');
 require('dotenv').config(); // Si usas .env en Vercel, configúralo en dashboard
-// const db = require('./firebase'); // Descomenta y configura para guardar en Firestore
+const db = require('./firebase'); // Descomentado: Tu firebase.js (Admin SDK)
 
 // Variables globales para sesiones (in-memory; resetean por invocación en serverless)
 const conversationHistory = new Map();
@@ -155,14 +155,15 @@ EJEMPLOS CORTOS (basados en PDF/slides con números):
 
 PERSONALIDAD: Profesional, amigable, emojis. Responde en español. Mantén conversaciones naturales y fluidas, sin repetir información ya dada en el historial.`;
 
-// Función para extraer datos del estudiante (igual al original)
+// Función para extraer datos del estudiante (MEJORADA: con lógica secuencial de cursos)
 function extractStudentData(message) {
   const data = {};
   const issues = [];
 
   const normalized = message.toLowerCase().replace(/[^\w\s@\-.:]/g, ' ').trim();
 
-  const nombreCandidates = normalized.split(/\s+/).filter(word => !word.match(/^\d/)).join(' ').match(/\b[a-záéíóúüñ]{3,}\s+[a-záéíóúüñ]{3,}\b/i);
+  // Nombre (mejorado: filtra palabras no-nombres)
+  const nombreCandidates = normalized.split(/\s+/).filter(word => !word.match(/^\d|numero|telefonico|correo|año|egreso|curso|ninguno|llevado/i)).join(' ').match(/\b[a-záéíóúüñ]{3,}\s+[a-záéíóúüñ]{3,}\b/i);
   if (nombreCandidates && nombreCandidates[0].split(' ').length >= 2) {
     data.nombre = nombreCandidates[0].charAt(0).toUpperCase() + nombreCandidates[0].slice(1);
   }
@@ -172,18 +173,21 @@ function extractStudentData(message) {
     data.correo = correoMatch[1].toLowerCase();
   }
 
-  const telefonoMatch = message.match(/(9\d{8})/);
+  const telefonoMatch = message.match(/(?:\+51\s?)?9\d{8}/);  // Mejorado: +51 opcional
   if (telefonoMatch) {
-    data.telefono = telefonoMatch[1];
+    data.telefono = telefonoMatch[0];
   }
 
-  const cicloMatch = message.match(/(\d{4}-[12])/i);
+  // Ciclo (mejorado: acepta 2023-1 o 202301)
+  const cicloMatch = message.match(/(\d{4}-[12]|\d{6})/i);
   if (cicloMatch) {
-    data.ciclo = cicloMatch[1].toUpperCase();
-    data.año_egreso = data.ciclo;
+    let ciclo = cicloMatch[1].toUpperCase();
+    if (ciclo.length === 6) ciclo = ciclo.slice(0,4) + '-' + ciclo.slice(4);  // Convierte 202301 → 2023-1
+    data.ciclo = ciclo;
+    data.año_egreso = ciclo;
     const [year, semester] = data.ciclo.split('-');
     const yearNum = parseInt(year);
-    const semesterNum = parseInt(semester);
+    const semesterNum = parseInt(semester || '1');
     if (yearNum > 2023 || (yearNum === 2023 && semesterNum > 2)) {
       issues.push('ciclo_no_elegible');
       data.elegible = false;
@@ -192,9 +196,29 @@ function extractStudentData(message) {
     }
   }
 
-  const cursoMatch = message.match(/(?:computaci[óo]n|comp)\s*([123]|ninguno)/i);
-  if (cursoMatch) {
-    data.ultimoCurso = cursoMatch[1].toLowerCase() === 'ninguno' ? 'ninguno' : `Computación ${cursoMatch[1]}`;
+  // Curso (mejorado: captura "llevado computacion2" → cursoTomado = '2', pendiente = '3')
+  const cursoTomadoMatch = message.match(/(?:llevado|llev[eo]|tomado)\s*(?:computaci[óo]n|comp)\s*([123]|ninguno)/i);
+  if (cursoTomadoMatch) {
+    data.cursoTomado = cursoTomadoMatch[1].toLowerCase();
+  } else if (message.toLowerCase().includes('ninguno')) {
+    data.cursoTomado = 'ninguno';
+  }
+
+  // Inferir pendiente secuencial (1→2→3)
+  if (data.cursoTomado) {
+    switch (data.cursoTomado) {
+      case '1': data.cursoPendiente = '2'; break;
+      case '2': data.cursoPendiente = '3'; break;
+      case '3': data.cursoPendiente = 'ninguno'; break;
+      case 'ninguno': data.cursoPendiente = '1'; break;
+      default: data.cursoPendiente = '1';
+    }
+    data.ultimoCurso = data.cursoTomado === 'ninguno' ? 'ninguno' : `Computación ${data.cursoTomado}`;
+  } else {
+    const cursoMatch = message.match(/(?:computaci[óo]n|comp)\s*([123]|ninguno)/i);
+    if (cursoMatch) {
+      data.ultimoCurso = cursoMatch[1].toLowerCase() === 'ninguno' ? 'ninguno' : `Computación ${cursoMatch[1]}`;
+    }
   }
 
   if (issues.length > 0) {
@@ -209,28 +233,52 @@ function datosFaltantes(data) {
   if (!data.nombre) faltan.push('nombre completo');
   if (!data.correo) faltan.push('correo institucional');
   if (!data.telefono) faltan.push('número telefónico');
-  if (!data.año_egreso) faltan.push('año de egreso (ej: 2022-1)');
-  if (!data.ultimoCurso) faltan.push('curso de computación actual (ej: Computación 2 o ninguno)');
+  if (!data.año_egreso) faltan.push('año de egreso (ej: 2022-1 o 202301)');  // Mejorado: acepta 202301
+  // Curso no en faltan inicial – se infiere después
   return faltan;
 }
 
-// Función para guardar en Firebase (igual al original; descomenta db si usas)
+// Función para guardar en Firebase (DESCOMMENTADO y mejorado con logs/error handling)
 async function guardarDatosEstudiante(data) {
-  // if (!db || !data || !data.nombre || !data.correo) return;
-  // try {
-  //   await db.collection('estudiantes').add({
-  //     nombre: data.nombre,
-  //     ciclo: data.ciclo || '',
-  //     correo: data.correo,
-  //     telefono: data.telefono || '',
-  //     año_egreso: data.año_egreso || '',
-  //     ultimoCurso: data.ultimoCurso || '',
-  //     fecha: new Date().toISOString()
-  //   });
-  //   console.log('✅ Datos guardados en Firebase:', data.correo);
-  // } catch (err) {
-  //   console.error('❌ Error guardando en Firebase:', err);
-  // }
+  if (!db || !data || !data.nombre || !data.correo) {
+    console.log('❌ No guardar: Faltan nombre/correo o db no listo', JSON.stringify(data));
+    return;
+  }
+  try {
+    console.log('🔄 Intentando guardar en Firebase:', JSON.stringify(data, null, 2));
+    await db.collection('estudiantes').add({  // Crea colección auto
+      nombre: data.nombre,
+      ciclo: data.ciclo || '',
+      correo: data.correo,
+      telefono: data.telefono || '',
+      año_egreso: data.año_egreso || '',
+      ultimoCurso: data.ultimoCurso || '',
+      cursoTomado: data.cursoTomado || 'ninguno',
+      cursoPendiente: data.cursoPendiente || '1',
+      elegible: data.elegible !== false,
+      fecha: admin.firestore.FieldValue.serverTimestamp()  // Timestamp auto
+    });
+    console.log('✅ Datos guardados en Firebase:', data.correo);
+  } catch (err) {
+    console.error('❌ Error guardando en Firebase:', err.message);
+    // Fallback: Log en colección 'errors' si existe
+    try {
+      await db.collection('errors').add({ error: err.message, data, timestamp: new Date() });
+    } catch (fallbackErr) {
+      console.error('Fallback log failed:', fallbackErr);
+    }
+  }
+}
+
+// Merge inteligente (nuevo: no sobrescribe datos previos)
+function mergeData(oldData, newData) {
+  const protectedKeys = ['nombre', 'correo', 'ciclo', 'año_egreso', 'ultimoCurso', 'cursoTomado', 'cursoPendiente'];
+  Object.keys(newData).forEach(key => {
+    if (protectedKeys.includes(key) && oldData[key]) {
+      delete newData[key];  // Ignora si viejo ya tiene
+    }
+  });
+  return { ...oldData, ...newData };
 }
 
 module.exports = async (req, res) => {
@@ -249,12 +297,14 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'Mensaje requerido' });
     }
 
-    // Extraer datos del estudiante del mensaje actual
+    // Extraer datos del estudiante del mensaje actual (mejorada)
     const extractedData = extractStudentData(message);
     let currentData = studentData.get(sessionId) || {};
-    currentData = { ...currentData, ...extractedData };
+    currentData = mergeData(currentData, extractedData);  // Merge inteligente
     currentData.lastActivity = Date.now();
     studentData.set(sessionId, currentData);
+
+    console.log('📊 Datos detectados:', JSON.stringify(currentData, null, 2));  // Log para debug
 
     // Verificar si ya se pidió datos en esta sesión
     const hasAskedForData = currentData.hasAskedForData || false;
@@ -274,7 +324,7 @@ module.exports = async (req, res) => {
       });
     }
 
-    // Determinar contexto adicional basado en elegibilidad y datos completos
+    // Determinar contexto adicional basado en elegibilidad y datos completos (MEJORADO: con cursos secuenciales)
     let additionalContext = '';
     if (currentData.ciclo && currentData.elegible === false) {
       additionalContext = `
@@ -286,20 +336,21 @@ module.exports = async (req, res) => {
     } else if (currentData.ciclo && currentData.elegible === true) {
       additionalContext = `
       El estudiante egresó en ${currentData.ciclo} - ES ELEGIBLE. Continúa con invitación y detalles (usa credenciales existentes; lista cursos si info general). Si faltan datos menores, pregunta suavemente.
+      Si cursoTomado (ej: '2'), infiere cursoPendiente ('3') y responde: "Te falta Computación ${cursoPendiente}: [descripción del PDF] S/200". No digas "ya llevaste X", solo enfócate en lo pendiente para guiar inscripción. Si 'ninguno', ofrece desde 1.
       `;
-      console.log('✅ Estudiante elegible:', currentData.ciclo);
+      console.log('✅ Estudiante elegible:', currentData.ciclo, 'Pendiente:', currentData.cursoPendiente || '1');
     } else {
       additionalContext = `
       No se detectó ciclo completo. Si es info general, lista cursos defrente. Pregunta datos solo si inscribir o faltan clave (no repitas si ya preguntado). Mantén corto.
       `;
     }
 
-    // Si todos los datos están completos, personaliza la respuesta SOLO la primera vez
+    // Si todos los datos están completos, personaliza la respuesta SOLO la primera vez (MEJORADO: incluye pendiente)
     const introSent = currentData.introSent || false;
     if (faltan.length === 0) {
       if (!introSent) {
         additionalContext += `
-        Todos los datos del estudiante están completos: ${JSON.stringify(currentData, null, 2)}. Esta es la primera respuesta con datos completos: Saluda por nombre (ej: Hola ${currentData.nombre}! 😊), confirma elegibilidad, resume su situación (ej: Has completado Computación 1, puedes inscribirte en 2 y/o 3), y pregunta qué necesita específicamente (info general, pasos de inscripción, dudas sobre pago, etc.). Proporciona info completa y útil basada en el PDF, sin cortar oraciones.`;
+        Todos los datos del estudiante están completos: ${JSON.stringify(currentData, null, 2)}. Esta es la primera respuesta con datos completos: Saluda por nombre (ej: Hola ${currentData.nombre}! 😊), confirma elegibilidad, resume su situación (ej: Te falta Computación ${cursoPendiente}, puedes inscribirte en eso), y pregunta qué necesita específicamente (info general, pasos de inscripción, dudas sobre pago, etc.). Proporciona info completa y útil basada en el PDF, sin cortar oraciones.`;
         currentData.introSent = true;
         studentData.set(sessionId, currentData);
       } else {
@@ -406,8 +457,9 @@ module.exports = async (req, res) => {
 
     if (!botResponse || botResponse.length < 50) {
       const introSent = currentData.introSent || false;
+      const pendienteDesc = currentData.cursoPendiente === '1' ? 'Microsoft Word (Intermedio - Avanzado)' : currentData.cursoPendiente === '2' ? 'Microsoft Excel (Básico - Intermedio - Avanzado)' : currentData.cursoPendiente === '3' ? 'IBM SPSS y MS Project' : 'ninguno';
       if (introSent) {
-        botResponse = `¡Hola de nuevo! 😊 ¿En qué puedo ayudarte con el Programa de Computación para Egresados? (Ej: detalles de pago, acceso al Aula USS, o dudas específicas). Basado en lo que ya sabemos de ti, dime qué necesitas exactamente.`;
+        botResponse = `¡Hola de nuevo! 😊 ¿En qué puedo ayudarte con el Programa de Computación para Egresados? (Ej: detalles de pago, acceso al Aula USS, o dudas específicas). Basado en lo que ya sabemos de ti, dime qué necesitas exactamente. Te falta Computación ${currentData.cursoPendiente || 1}: ${pendienteDesc}.`;
       } else {
         botResponse = `¡Hola ${currentData.nombre || ''}! 😊 Gracias por proporcionar tus datos. Basado en tu información (egresado ${currentData.ciclo || 'reciente'}, curso actual: ${currentData.ultimoCurso || 'ninguno'}), eres elegible para el Programa de Computación para Egresados (hasta 2023-2).
 
@@ -445,9 +497,9 @@ Para más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinf
     currentData.interactions = (currentData.interactions || 0) + 1;
     studentData.set(sessionId, currentData);
 
-    // Guardar datos en Firestore si están disponibles
+    // Guardar datos en Firestore si están disponibles (DESCOMMENTADO)
     if (currentData.nombre && currentData.correo) {
-      // await guardarDatosEstudiante(currentData); // Descomenta si usas Firebase
+      await guardarDatosEstudiante(currentData);
     }
 
     console.log('✅ Respuesta enviada exitosamente (longitud:', botResponse.length, ')');
