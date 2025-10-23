@@ -7,8 +7,8 @@ module.exports = async (req, res) => {
   }
 
   try {
-    // Clave API hardcodeada temporalmente para evitar problemas con Environment Variables
-    const GEMINI_API_KEY = 'AIzaSyDB0hTWu-d3i5EIlzA34KwjEN4nQiq_SjE';
+  // Usar la clave API desde variable de entorno
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     if (!GEMINI_API_KEY) {
       return res.status(500).json({ error: 'Falta la variable de entorno GEMINI_API_KEY' });
     }
