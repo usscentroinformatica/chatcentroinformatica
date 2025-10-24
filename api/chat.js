@@ -1,8 +1,3 @@
-// chat.js - Actualizado: Descomenta Firebase, usa el db inicializado, y asegura que guardarDatosEstudiante funcione
-// Asegúrate de que firebase.js esté en el mismo directorio y que las env vars de Vercel estén configuradas correctamente
-// (ej: FIREBASE_PROJECT_ID=egresadoschat, FIREBASE_CLIENT_EMAIL=firebase-adminsdk-fbsvc@egresadoschat.iam.gserviceaccount.com,
-// FIREBASE_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\nMIIE... (con \n escapados como \\n en Vercel))
-
 const fetch = require('node-fetch');
 require('dotenv').config();
 const { db, admin } = require('./firebase'); // Ahora descomentado: inicializa Admin SDK y exporta admin
@@ -156,6 +151,7 @@ EJEMPLOS CORTOS (basados en PDF/slides con números):
 PERSONALIDAD: Profesional, amigable, emojis. Responde en español. Mantén conversaciones naturales y fluidas, sin repetir información ya dada en el historial.`;
 
 // Función para extraer datos del estudiante (igual al original)
+// Función para extraer datos del estudiante (actualizada: maneja formatos de ciclo como 202301 o 2023-1)
 function extractStudentData(message) {
   const data = {};
   const issues = [];
@@ -177,19 +173,24 @@ function extractStudentData(message) {
     data.telefono = telefonoMatch[1];
   }
 
-  const cicloMatch = message.match(/(\d{4}-[12])/i);
+  // Actualizado: Maneja formatos YYYY[12] (ej: 202301) o YYYY-[12] (ej: 2023-1)
+  let cicloMatch = message.match(/(\d{4})([12])/i) || message.match(/(\d{4})[-\/]([12])/i);
   if (cicloMatch) {
-    data.ciclo = cicloMatch[1].toUpperCase();
+    const year = cicloMatch[1];
+    const sem = cicloMatch[2];
+    data.ciclo = `${year}-${sem}`;
     data.año_egreso = data.ciclo;
-    const [year, semester] = data.ciclo.split('-');
     const yearNum = parseInt(year);
-    const semesterNum = parseInt(semester);
+    const semesterNum = parseInt(sem);
     if (yearNum > 2023 || (yearNum === 2023 && semesterNum > 2)) {
       issues.push('ciclo_no_elegible');
       data.elegible = false;
     } else {
       data.elegible = true;
     }
+  } else {
+    // Si no se detecta, asume elegible por defecto (egresados)
+    data.elegible = true;
   }
 
   const cursoMatch = message.match(/(?:computaci[óo]n|comp)\s*([123]|ninguno)/i);
@@ -202,6 +203,16 @@ function extractStudentData(message) {
   }
 
   return data;
+}
+
+function datosFaltantes(data) {
+  const faltan = [];
+  if (!data.nombre) faltan.push('nombre completo');
+  if (!data.correo) faltan.push('correo institucional');
+  if (!data.telefono) faltan.push('número telefónico');
+  // Removido: 'año de egreso' - no se pide ya que son egresados (se asume elegible si no se proporciona)
+  if (!data.ultimoCurso) faltan.push('curso de computación actual (ej: Computación 2 o ninguno)');
+  return faltan;
 }
 
 function datosFaltantes(data) {
