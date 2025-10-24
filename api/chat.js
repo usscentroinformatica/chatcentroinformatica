@@ -5,7 +5,7 @@
 
 const fetch = require('node-fetch');
 require('dotenv').config();
-const db = require('./firebase'); // Ahora descomentado: inicializa Admin SDK
+const { db, admin } = require('./firebase'); // Ahora descomentado: inicializa Admin SDK y exporta admin
 
 // Variables globales para sesiones (in-memory; resetean por invocación en serverless)
 const conversationHistory = new Map();
@@ -216,8 +216,8 @@ function datosFaltantes(data) {
 
 // Función para guardar en Firebase (descomentada y corregida: usa Admin SDK)
 async function guardarDatosEstudiante(data) {
-  if (!db || !data || !data.nombre || !data.correo) {
-    console.log('⚠️ No se guarda: faltan datos clave o db no inicializado');
+  if (!db || !admin || !data || !data.nombre || !data.correo) {
+    console.log('⚠️ No se guarda: faltan datos clave o db/admin no inicializado');
     return;
   }
   try {
@@ -245,7 +245,8 @@ module.exports = async (req, res) => {
   try {
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     if (!GEMINI_API_KEY) {
-      return res.status(500).json({ error: 'Falta la variable de entorno GEMINI_API_KEY' });
+      console.error('❌ Faltan env vars: GEMINI_API_KEY no configurada');
+      return res.status(500).json({ error: 'Falta la variable de entorno GEMINI_API_KEY. Verifica en Vercel.' });
     }
 
     const { message, sessionId = 'default' } = req.body || {};
@@ -409,6 +410,7 @@ module.exports = async (req, res) => {
     }
 
     if (!botResponse || botResponse.length < 50) {
+      console.log('⚠️ Usando fallback: Todos los modelos fallaron. Último error:', lastError);
       const introSent = currentData.introSent || false;
       if (introSent) {
         botResponse = `¡Hola de nuevo! 😊 ¿En qué puedo ayudarte con el Programa de Computación para Egresados? (Ej: detalles de pago, acceso al Aula USS, o dudas específicas). Basado en lo que ya sabemos de ti, dime qué necesitas exactamente.`;
