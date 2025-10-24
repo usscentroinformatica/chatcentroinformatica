@@ -98,6 +98,7 @@ INSTRUCCIONES CRÍTICAS:
 - Si el usuario pregunta por "computacion 1", explica los detalles de ese curso específico.
 - Cuida la coherencia conversacional: verifica lo que el usuario ha dicho antes de responder.
 - Los nombres verdaderos de personas suelen incluir apellidos (ej: "Miguel Maquen") y NO contienen palabras como: explicame, proceso, computacion, inscripción.
+- Usa 'grado de bachiller' en lugar de 'título' cuando hables de la acreditación o propósito del programa.
 
 En tus respuestas:
 1. SÉ CONVERSACIONAL Y AMABLE - Como un asesor real, no un bot robótico.
@@ -612,16 +613,12 @@ Para continuar con el Programa de Computación para Egresados, te recomiendo ins
 Para más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinformatica@uss.edu.pe.`;
       } 
       else if (currentData.introSent) {
-        // Fallback general
-        botResponse = `El Programa de Computación para Egresados incluye tres cursos, cada uno a S/ 200:
-
-📚 Computación 1: Microsoft Word (Intermedio - Avanzado)
-📚 Computación 2: Microsoft Excel (Básico - Intermedio - Avanzado)
-📚 Computación 3: IBM SPSS y MS Project
+        // Fallback general (corregido para usar "grado de bachiller")
+        botResponse = `¡Hola! Sí, es correcto, el programa consta de 3 cursos en total: Computación 1 (Microsoft Word), Computación 2 (Microsoft Excel) y Computación 3 (IBM SPSS y MS Project). Estos cursos están diseñados para ayudarte a acreditar los conocimientos de computación que necesitas para obtener tu grado de bachiller.
 
 Todos los cursos son 100% virtuales a través del Aula USS, con material disponible 24/7 para que avances a tu propio ritmo.
 
-¿En cuál de estos cursos estás interesado o prefieres que te explique el proceso de inscripción?
+¿Tienes alguna duda sobre el contenido de alguno de los cursos o sobre el proceso para inscribirte?
 
 Para más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinformatica@uss.edu.pe.`;
       } else {
