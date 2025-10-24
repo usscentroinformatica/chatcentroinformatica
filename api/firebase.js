@@ -1,24 +1,19 @@
-// Firebase Admin SDK para Node.js
-const { initializeApp, applicationDefault, cert } = require('firebase-admin/app');
-const { getFirestore } = require('firebase-admin/firestore');
+// firebase.js - Actualizado para usar Firebase Admin SDK en servidor (Vercel/Node.js)
+// Usa las variables de entorno de Vercel para el service account
+const admin = require('firebase-admin');
 
-// Configuración de credenciales (usa variables de entorno o archivo de clave si lo tienes)
-// Firebase SDK para Web (compatible con Vercel)
-const { initializeApp } = require('firebase/app');
-const { getFirestore } = require('firebase/firestore');
+// Inicializar solo si no está ya inicializado
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'), // Reemplaza \\n por saltos de línea reales
+    }),
+    // Opcional: databaseURL: `https://${process.env.FIREBASE_PROJECT_ID}.firebaseio.com`
+  });
+}
 
-const firebaseConfig = {
-  apiKey: "AIzaSyBtP-1r5wPWwsmuOuLoMXO9PyGvYxXGStA",
-  authDomain: "egresadoschat.firebaseapp.com",
-  projectId: "egresadoschat",
-  storageBucket: "egresadoschat.firebasestorage.app",
-  messagingSenderId: "455022690021",
-  appId: "1:455022690021:web:f7a0b4d19ec9dda38a5e0c",
-  measurementId: "G-KE04QHM6XT"
-};
-
-// Inicializar Firebase Admin
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+const db = admin.firestore();
 
 module.exports = db;
