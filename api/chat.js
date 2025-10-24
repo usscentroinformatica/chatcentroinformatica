@@ -1,6 +1,4 @@
-// chat.js - Versión mejorada con conversaciones más naturales y contextuales
-// Mejoras: Reconocimiento de cursos actuales, flujo de conversación natural, información personalizada
-
+// chat.js - Versión compatible con Gemini API pero con lógica de conversación natural
 const fetch = require('node-fetch');
 require('dotenv').config();
 const { db, admin } = require('./firebase'); // Inicializa Admin SDK y exporta admin
@@ -9,7 +7,7 @@ const { db, admin } = require('./firebase'); // Inicializa Admin SDK y exporta a
 const conversationHistory = new Map();
 const studentData = new Map(); // Fallback local, pero usa Firestore para persistencia
 
-// Contenido del PDF (fallback hardcodeado, ya que no hay fs en serverless)
+// Contenido del PDF (se mantiene igual que en el original)
 const pdfContent = `PROGRAMA COMPUTACION PARA EGRESADOS
 
 COMPUTACIÓN PARA EGRESADOS
@@ -90,7 +88,16 @@ GRACIAS 986 724 506 centrodeinformatica@uss.edu.pe PROGRAMA DE COMPUTACIÓN PARA
 INFORMACIÓN EXTRA: Deudas pendientes no afectan inscripción (independiente). Olvidé usuario/contraseña Campus/Aula: Contacta ciso.dti@uss.edu.pe o helpdesk1@uss.edu.pe. Constancias: acempresariales@uss.edu.pe. Cambio horarios: paccis@uss.edu.pe con pruebas.`;
 
 // Configuración del contexto del Centro de Informática USS (MEJORADO)
-const SYSTEM_CONTEXT = `Eres un asistente virtual amigable y conversacional del Centro de Informática USS en Chiclayo, Perú. Ayuda con el Programa de Computación para Egresados: sé preciso pero natural, como una conversación real. ANALIZA el PDF proporcionado para responder con información exacta. 
+const SYSTEM_CONTEXT = `Eres un asistente virtual amigable y conversacional del Centro de Informática USS en Chiclayo, Perú. Ayuda con el Programa de Computación para Egresados: sé preciso pero natural, como una conversación real. ANALIZA el PDF proporcionado para responder con información exacta.
+
+INSTRUCCIONES CRÍTICAS:
+- NUNCA uses palabras del mensaje del usuario como si fueran nombres de personas. Frases como "explicame el proceso" o "computacion 1" NO son nombres.
+- IMPORTANTE: Cuando el usuario menciona "computacion 1", "computacion 2", etc., NO asumas automáticamente que ya completó ese curso; más bien entiende que está preguntando por ese curso específico.
+- NO repitas exactamente la misma respuesta en turnos consecutivos.
+- SI el usuario pide "explicame el proceso" o similar, responde con el proceso de inscripción, no con información general.
+- Si el usuario pregunta por "computacion 1", explica los detalles de ese curso específico.
+- Cuida la coherencia conversacional: verifica lo que el usuario ha dicho antes de responder.
+- Los nombres verdaderos de personas suelen incluir apellidos (ej: "Miguel Maquen") y NO contienen palabras como: explicame, proceso, computacion, inscripción.
 
 En tus respuestas:
 1. SÉ CONVERSACIONAL Y AMABLE - Como un asesor real, no un bot robótico.
@@ -103,7 +110,7 @@ IMPORTANTE:
 - EXCLUSIVO para egresados pregrado hasta 2023-2 con pendiente en computación.
 - Si ciclo > 2023-2: No elegible, redirige a paccis@uss.edu.pe.
 - Deudas pendientes: No afectan inscripción; el programa es independiente de malla curricular.
-- Olvidé usuario/contraseña Campus/Aula USS: Redirige a ciso.dti@uss.edu.pe o helpdesk1@uss.edu.pe.
+- Olvidé usuario/contraseña Campus/Aula: Redirige a ciso.dti@uss.edu.pe o helpdesk1@uss.edu.pe.
 - Constancias: Redirige a acempresariales@uss.edu.pe.
 - Cambios horario/académicos: Redirige a paccis@uss.edu.pe (adjunta pruebas; revisa horarios para evitar cruces).
 - NO info de otros servicios.
@@ -177,7 +184,22 @@ function extractStudentInfo(message) {
   // Extraer nombre (asumiendo formato "nombre apellido")
   const nombreRegex = /(?:[a-zñáéíóú]+ [a-zñáéíóú]+(?:\s*[a-zñáéíóú]+)?)/i;
   const nombreMatch = message.match(nombreRegex);
-  if (nombreMatch && nombreMatch[0].length > 5) info.nombre = nombreMatch[0];
+  
+  // Lista de palabras que NO deben ser consideradas nombres
+  const palabrasNoNombres = ['explicame', 'explícame', 'explicar', 'proceso', 'computacion', 'computación', 
+                           'inscripcion', 'inscripción', 'informacion', 'información', 'registro', 'pago', 
+                           'pasos', 'como', 'cómo', 'ayuda', 'necesito', 'quiero', 'porfavor', 'por favor'];
+  
+  if (nombreMatch && nombreMatch[0].length > 5) {
+    const posibleNombre = nombreMatch[0].toLowerCase();
+    
+    // Verificar que no sea uno de los términos prohibidos
+    const esNoNombre = palabrasNoNombres.some(palabra => posibleNombre.includes(palabra));
+    
+    if (!esNoNombre) {
+      info.nombre = nombreMatch[0];
+    }
+  }
   
   // Extraer número telefónico
   const phoneRegex = /\b9\d{8}\b|\b[7-9]\d{8}\b/;
@@ -185,9 +207,23 @@ function extractStudentInfo(message) {
   if (phoneMatch) info.telefono = phoneMatch[0];
   
   // Extraer último curso (computacion 1/2/3)
+  // IMPORTANTE: Solo extraer como "ultimoCurso" si explícitamente dice que ya lo completó
   const cursoRegex = /computaci[oó]n\s*[123]/i;
   const cursoMatch = message.match(cursoRegex);
-  if (cursoMatch) info.ultimoCurso = cursoMatch[0].toLowerCase();
+  
+  if (cursoMatch) {
+    // Frases que indican que ya completó el curso
+    const frasesCursoCompletado = ['ya llevé', 'ya lleve', 'ya completé', 'ya complete', 'terminé', 'termine', 
+                                 'aprobé', 'aprobe', 'he llevado', 'he completado', 'he terminado', 'he aprobado'];
+    
+    // Verificar si alguna de estas frases está en el mensaje
+    const esCursoCompletado = frasesCursoCompletado.some(frase => message.toLowerCase().includes(frase));
+    
+    // Solo asignar como ultimoCurso si explícitamente dice que lo completó
+    if (esCursoCompletado) {
+      info.ultimoCurso = cursoMatch[0].toLowerCase();
+    }
+  }
   
   return info;
 }
@@ -207,26 +243,26 @@ function getSiguienteCurso(cursoActual) {
   }
 }
 
-// Función para generar respuestas personalizadas basadas en el progreso del estudiante
-function generarRespuestaPersonalizada(currentData) {
-  if (!currentData.ultimoCurso) {
-    return null; // Sin curso actual, usar respuesta estándar
+// Función para verificar elegibilidad
+function verificarElegibilidad(ciclo) {
+  if (!ciclo) return true; // Si no hay ciclo, asumimos elegible
+  
+  try {
+    // Normalizar formato a año-periodo (ej. 2023-1)
+    let cicloNormalizado = ciclo;
+    if (ciclo.length === 6) { // Si es formato 202301
+      cicloNormalizado = `${ciclo.substring(0, 4)}-${parseInt(ciclo.substring(4, 6), 10)}`;
+    }
+    
+    // Separar año y periodo
+    const [year, period] = cicloNormalizado.split('-').map(part => parseInt(part, 10));
+    
+    // Verificar si es <= 2023-2
+    return (year < 2023) || (year === 2023 && period <= 2);
+  } catch (error) {
+    console.error('❌ Error verificando elegibilidad:', error, ciclo);
+    return true; // En caso de error, asumimos elegible
   }
-  
-  const siguienteCurso = getSiguienteCurso(currentData.ultimoCurso);
-  const cursoActual = currentData.ultimoCurso.toLowerCase();
-  
-  let respuestaPersonalizada = "";
-  
-  // Si ya tiene algún curso, personalizar respuesta
-  if (cursoActual.includes("1")) {
-    respuestaPersonalizada = `¡Hola ${currentData.nombre || ''}! 😊\n\nVeo que ya has completado ${currentData.ultimoCurso}, ¡felicitaciones por este avance! 👏\n\nPara continuar con tu progreso en el Programa de Computación para Egresados, ahora puedes inscribirte en ${siguienteCurso}, que se enfoca en Microsoft Excel (niveles básico, intermedio y avanzado).\n\n¿Te gustaría recibir información detallada sobre los contenidos de ${siguienteCurso} o prefieres que te explique directamente el proceso de inscripción? También puedes inscribirte en Computación 3 si lo deseas, ya que los cursos pueden llevarse en paralelo.\n\nPara más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinformatica@uss.edu.pe.`;
-  } 
-  else if (cursoActual.includes("2")) {
-    respuestaPersonalizada = `¡Hola ${currentData.nombre || ''}! 😊\n\n¡Excelente progreso con ${currentData.ultimoCurso}! 🎉 Ya casi completas el programa.\n\nAhora puedes dar el paso final inscribiéndote en ${siguienteCurso}, que te enseñará IBM SPSS y MS Project, herramientas muy valiosas para tu carrera profesional.\n\n¿Te gustaría conocer más sobre los contenidos específicos de este último curso o prefieres que te explique directamente el proceso de inscripción?\n\nPara más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinformatica@uss.edu.pe.`;
-  }
-  
-  return respuestaPersonalizada;
 }
 
 // Función para cargar datos de estudiante desde Firestore
@@ -277,28 +313,6 @@ async function saveStudentData(sessionId, data) {
     // Al menos guarda en Map local como fallback
     studentData.set(sessionId, data);
     return false;
-  }
-}
-
-// Función para verificar elegibilidad
-function verificarElegibilidad(ciclo) {
-  if (!ciclo) return true; // Si no hay ciclo, asumimos elegible
-  
-  try {
-    // Normalizar formato a año-periodo (ej. 2023-1)
-    let cicloNormalizado = ciclo;
-    if (ciclo.length === 6) { // Si es formato 202301
-      cicloNormalizado = `${ciclo.substring(0, 4)}-${parseInt(ciclo.substring(4, 6), 10)}`;
-    }
-    
-    // Separar año y periodo
-    const [year, period] = cicloNormalizado.split('-').map(part => parseInt(part, 10));
-    
-    // Verificar si es <= 2023-2
-    return (year < 2023) || (year === 2023 && period <= 2);
-  } catch (error) {
-    console.error('❌ Error verificando elegibilidad:', error, ciclo);
-    return true; // En caso de error, asumimos elegible
   }
 }
 
@@ -385,32 +399,52 @@ Para más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinf
     
     // Si es la primera interacción, usar mensaje de bienvenida
     if (isFirstMessage) {
-      conversationContext = `[El usuario acaba de iniciar la conversación. Preséntate brevemente como asistente del Centro de Informática USS y solicita datos básicos (nombre, correo, teléfono, curso actual) para ayudarle mejor. Sé breve y amigable, no recites una lista completa de servicios aún.]`;
-    } else if (message.toLowerCase().includes('si') && (currentData.nombre && currentData.correo)) {
-      // Si el usuario responde "sí" después de dar sus datos y está pidiendo información general
+      conversationContext = `[El usuario acaba de iniciar la conversación con "${message}". Preséntate brevemente como asistente del Centro de Informática USS y solicita datos básicos (nombre, correo, teléfono, curso actual) para ayudarle mejor. Sé breve y amigable, no recites una lista completa de servicios aún.]`;
+    } 
+    // Si el mensaje es "explicame el proceso" o similar
+    else if (message.toLowerCase().includes('explicame') || message.toLowerCase().includes('explícame') || 
+            message.toLowerCase().includes('proceso') || message.toLowerCase().includes('pasos') ||
+            message.toLowerCase().includes('cómo me inscribo') || message.toLowerCase().includes('como me inscribo')) {
       
-      // Generar respuesta personalizada basada en su progreso (si aplica)
-      const respuestaPersonalizada = generarRespuestaPersonalizada(currentData);
+      conversationContext = `[El usuario está pidiendo que le expliques el PROCESO DE INSCRIPCIÓN. NO trates "explicame el proceso" como un nombre. Proporciona los pasos detallados para inscribirse: 1) Ingresar al campus USS, 2) Ir a Trámites, etc. Incluye también información sobre los métodos de pago disponibles. Sé claro y directo.]`;
+    }
+    // Si el mensaje menciona computacion 1, 2 o 3
+    else if (message.toLowerCase().includes('computacion 1') || message.toLowerCase().includes('computación 1') ||
+            message.toLowerCase() === 'computacion1' || message.toLowerCase() === 'computación1' || message.toLowerCase() === '1') {
       
-      if (respuestaPersonalizada) {
-        // Si tiene curso previo, usar respuesta personalizada
-        return res.status(200).json({ 
-          response: respuestaPersonalizada,
-          sessionId,
-          studentData: currentData,
-          isEligible: currentData.elegible !== false
-        });
+      conversationContext = `[El usuario está preguntando sobre el curso "Computación 1" (Microsoft Word). NO asumas que ya lo ha completado a menos que explícitamente lo haya mencionado antes. Proporciona información detallada sobre el contenido de este curso específico, su metodología y costo (S/ 200). Sé conversacional y amigable.]`;
+    }
+    else if (message.toLowerCase().includes('computacion 2') || message.toLowerCase().includes('computación 2') ||
+            message.toLowerCase() === 'computacion2' || message.toLowerCase() === 'computación2' || message.toLowerCase() === '2') {
+      
+      conversationContext = `[El usuario está preguntando sobre el curso "Computación 2" (Microsoft Excel). NO asumas que ya lo ha completado a menos que explícitamente lo haya mencionado antes. Proporciona información detallada sobre el contenido de este curso específico, su metodología y costo (S/ 200). Sé conversacional y amigable.]`;
+    }
+    else if (message.toLowerCase().includes('computacion 3') || message.toLowerCase().includes('computación 3') ||
+            message.toLowerCase() === 'computacion3' || message.toLowerCase() === 'computación3' || message.toLowerCase() === '3') {
+      
+      conversationContext = `[El usuario está preguntando sobre el curso "Computación 3" (IBM SPSS y MS Project). NO asumas que ya lo ha completado a menos que explícitamente lo haya mencionado antes. Proporciona información detallada sobre el contenido de este curso específico, su metodología y costo (S/ 200). Sé conversacional y amigable.]`;
+    }
+    // Si el mensaje es "si" o "si porfavor" después de dar datos
+    else if ((message.toLowerCase() === 'si' || message.toLowerCase() === 'sí' || 
+             message.toLowerCase().includes('si porfavor') || message.toLowerCase().includes('sí por favor')) && 
+             (currentData.nombre || currentData.correo)) {
+      
+      // Si ya completó algún curso, personalizar respuesta
+      if (currentData.ultimoCurso) {
+        const siguienteCurso = getSiguienteCurso(currentData.ultimoCurso);
+        
+        conversationContext = `[El usuario ha confirmado que quiere información. Dado que ya ha completado ${currentData.ultimoCurso}, felicítalo por su avance y recomiéndale inscribirse en ${siguienteCurso}. Explícale brevemente el contenido de ${siguienteCurso} y pregúntale si desea saber más sobre el contenido o el proceso de inscripción. Sé conversacional y motivador.]`;
       } else {
         // Contexto para responder a "sí, quiero información general"
-        conversationContext = `[El usuario ha proporcionado sus datos (${currentData.nombre || 'sin nombre'}, ${currentData.correo || 'sin correo'}, ${currentData.telefono || 'sin teléfono'}, curso actual: ${currentData.ultimoCurso || 'ninguno'}) y ahora quiere información general del programa. 
-        
-        NO pases directamente a los pasos de pago. Primero EXPLICA el programa completo, los cursos disponibles (Computación 1, 2 y 3) con sus contenidos y costos. Después pregúntale si quiere conocer el proceso de inscripción y pago. Sé conversacional y natural. Recuerda que cada curso cuesta S/ 200. Si ya tiene algún curso (${currentData.ultimoCurso || 'ninguno'}), mencionarlo y felicitarlo por su avance.]`;
+        conversationContext = `[El usuario ha confirmado que quiere información general del Programa de Computación para Egresados. Proporciona primero información sobre los tres cursos disponibles (Computación 1, 2 y 3) y sus contenidos. NO pases directamente a los pasos de pago sin antes explicar el programa completo. Pregunta al final si desea conocer el proceso de inscripción. Sé conversacional y natural.]`;
       }
-    } else {
-      // Para cualquier otra interacción, proveer contexto con los datos del estudiante
-      conversationContext = `[El usuario tiene estos datos: ${currentData.nombre || 'sin nombre'}, ${currentData.correo || 'sin correo'}, ${currentData.telefono || 'sin teléfono'}, ciclo: ${currentData.ciclo || 'desconocido'}, curso actual: ${currentData.ultimoCurso || 'ninguno'}. 
+    }
+    // Para cualquier otra interacción
+    else {
+      // Contexto general con los datos del estudiante
+      conversationContext = `[El usuario ha enviado el mensaje: "${message}". Tiene estos datos: ${currentData.nombre ? 'nombre: ' + currentData.nombre : 'sin nombre'}, ${currentData.correo ? 'correo: ' + currentData.correo : 'sin correo'}, ${currentData.telefono ? 'teléfono: ' + currentData.telefono : 'sin teléfono'}, ciclo: ${currentData.ciclo || 'desconocido'}, curso actual: ${currentData.ultimoCurso || 'ninguno'}. 
       
-      Si ya tiene algún curso (${currentData.ultimoCurso || 'ninguno'}), personaliza tu respuesta mencionándolo y recomendando el siguiente curso. Sé conversacional y amigable. Recuerda la progresión: Computación 1 (Word) → Computación 2 (Excel) → Computación 3 (SPSS/Project). Cada curso cuesta S/ 200. Si pregunta por proceso de inscripción o pagos, da los detalles completos.]`;
+      Si ya ha mencionado que completó algún curso (${currentData.ultimoCurso || 'ninguno'}), personaliza tu respuesta refiriéndote a ello y recomienda el siguiente curso. Recuerda: NO interpretes mensajes como "explicame el proceso" o "computacion 1" como nombres de personas. Sé conversacional y natural, evitando respuestas repetitivas.]`;
     }
     
     // Obtener historial de conversación
@@ -457,7 +491,7 @@ Para más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinf
                 },
                 {
                   role: 'model',
-                  parts: [{ text: 'Entendido. Seré un asistente virtual amigable y conversacional del Centro de Informática USS, enfocado en el Programa de Computación para Egresados. Personalizaré mis respuestas según el nivel del estudiante, seré natural en mi comunicación y proporcionaré información relevante y útil.' }]
+                  parts: [{ text: 'Entendido. Seré un asistente virtual amigable y conversacional del Centro de Informática USS, enfocado en el Programa de Computación para Egresados. Personalizaré mis respuestas según el nivel del estudiante, seré natural en mi comunicación y proporcionaré información relevante y útil. Nunca confundiré frases como "explicame el proceso" o "computacion 1" con nombres de personas.' }]
                 },
                 ...historyFormatted,
                 {
@@ -519,34 +553,72 @@ Para más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinf
     if (!botResponse || botResponse.length < 50) {
       console.log('⚠️ Usando fallback: Todos los modelos fallaron. Último error:', lastError);
       
-      // Personalizar fallback según el progreso del estudiante
-      if (currentData.ultimoCurso) {
+      // Respuestas de fallback según el contexto del mensaje
+      if (message.toLowerCase().includes('explicame') || message.toLowerCase().includes('explícame') || 
+          message.toLowerCase().includes('proceso') || message.toLowerCase().includes('pasos')) {
+        // Fallback para proceso de inscripción
+        botResponse = `Para inscribirte en el Programa de Computación para Egresados, sigue estos pasos:
+
+1. Ingresa al Campus USS con tus credenciales.
+2. Ve a la sección de "Trámites".
+3. Selecciona "PROGRAMACION DE SERVICIOS".
+4. Busca y elige la opción "PROGRAMA DE COMPUTACIÓN PARA EGRESADOS USS".
+5. Haz clic en "Programar".
+6. Realiza el pago de S/ 200 por el curso que deseas llevar.
+7. Envía el comprobante de pago a centrodeinformatica@uss.edu.pe.
+
+Puedes pagar mediante: Campus Virtual (tarjeta o QR), Yape (servicios programables), Aplicativo BCP, o Agente BCP (cuenta: 305-1552328-0-87).
+
+¿En cuál de los cursos estás interesado?
+
+Para más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinformatica@uss.edu.pe.`;
+      } 
+      else if (message.toLowerCase().includes('computacion 1') || message.toLowerCase().includes('computación 1')) {
+        // Fallback para Computación 1
+        botResponse = `En Computación 1 aprenderás Microsoft Word a nivel intermedio y avanzado, incluyendo:
+
+- Formato y edición avanzada de documentos
+- Estilos y plantillas profesionales
+- Tablas de contenido e índices
+- Control de cambios y trabajo colaborativo
+- Combinación de correspondencia
+
+El curso tiene un costo de S/ 200 y se evalúa mediante 4 cuestionarios de 30 minutos cada uno, con acceso 24/7 en la plataforma Aula USS.
+
+¿Te gustaría inscribirte en este curso o necesitas información sobre el proceso?
+
+Para más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinformatica@uss.edu.pe.`;
+      }
+      else if (currentData.ultimoCurso) {
+        // Personalizar fallback según el progreso del estudiante
         const siguienteCurso = getSiguienteCurso(currentData.ultimoCurso);
         
-        botResponse = `¡Hola ${currentData.nombre || ''}! 😊 
+        botResponse = `¡Hola! 😊 
 
-Veo que ya has completado ${currentData.ultimoCurso}. ¡Excelente progreso! 👏
+Veo que ya has completado ${currentData.ultimoCurso}. ¡Felicitaciones por tu avance! 👏
 
-Para continuar con el Programa de Computación para Egresados, ahora puedes inscribirte en ${siguienteCurso}.
+Para continuar con el Programa de Computación para Egresados, te recomiendo inscribirte en ${siguienteCurso}. Cada curso tiene un costo de S/ 200.
 
-¿Te gustaría conocer más detalles sobre los contenidos de este curso o prefieres que te explique el proceso de inscripción directamente?
+¿Te gustaría conocer más detalles sobre los contenidos de este curso o prefieres que te explique el proceso de inscripción?
 
 Para más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinformatica@uss.edu.pe.`;
       } 
       else if (currentData.introSent) {
-        botResponse = `¡Hola de nuevo ${currentData.nombre || ''}! 😊 
-
-El Programa de Computación para Egresados incluye tres cursos, cada uno a S/ 200:
+        // Fallback general
+        botResponse = `El Programa de Computación para Egresados incluye tres cursos, cada uno a S/ 200:
 
 📚 Computación 1: Microsoft Word (Intermedio - Avanzado)
 📚 Computación 2: Microsoft Excel (Básico - Intermedio - Avanzado)
 📚 Computación 3: IBM SPSS y MS Project
 
-¿En cuál de estos cursos estás interesado? ¿O prefieres que te explique el proceso de inscripción?
+Todos los cursos son 100% virtuales a través del Aula USS, con material disponible 24/7 para que avances a tu propio ritmo.
+
+¿En cuál de estos cursos estás interesado o prefieres que te explique el proceso de inscripción?
 
 Para más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinformatica@uss.edu.pe.`;
       } else {
-        botResponse = `¡Hola! 👋 Bienvenido al Centro de Informática de la Universidad Señor de Sipán. Soy tu asistente virtual y estoy aquí para ayudarte con consultas sobre el Programa de Computación para Egresados.
+        // Fallback para primera interacción
+        botResponse = `¡Hola! 👋 Bienvenido al Centro de Informática de la Universidad Señor de Sipán. Soy tu asistente virtual y estoy aquí para ayudarte con el Programa de Computación para Egresados.
 
 Para ayudarte mejor, ¿podrías proporcionarme algunos datos?
 - Tu nombre completo
