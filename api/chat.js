@@ -461,11 +461,17 @@ Para más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinf
       parts: [{ text: msg.content }]
     }));
     
-    // Modelos a intentar en orden de preferencia
+    // Modelos a intentar en orden de preferencia (actualizado con versiones 2.5 y 2.0 para mayor naturalidad)
+    // Enlaces de referencia para Gemini API: 
+    // - Docs oficiales: https://ai.google.dev/gemini-api/docs/models/gemini
+    // - Modelos 2.5: https://ai.google.dev/gemini-api/docs/models/gemini-2-5 (disponible en Oct 2025)
+    // - Configuración de API Key: https://ai.google.dev/gemini-api/docs/api-key
     const models = [
-      'gemini-1.0-pro',
-      'gemini-1.5-flash',
-      'gemini-pro'
+      'gemini-2.5-pro',
+      'gemini-2.5-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-2.0-flash',
+      'gemini-2.0-flash-lite'
     ];
     
     let botResponse = null;
@@ -500,7 +506,7 @@ Para más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinf
                 }
               ],
               generationConfig: {
-                temperature: 0.7,
+                temperature: 0.7,  // Para naturalidad en conversaciones; baja a 0.5 si quieres más consistencia
                 maxOutputTokens: 600,
                 topP: 0.8,
                 topK: 40
@@ -532,19 +538,21 @@ Para más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinf
           if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text) {
             botResponse = data.candidates[0].content.parts[0].text.trim();
             if (botResponse.length < 50) {
-              console.log('⚠️ Respuesta muy corta, probando siguiente modelo.');
+              console.log(`⚠️ Respuesta muy corta con ${model} (longitud: ${botResponse.length}), probando siguiente modelo.`);
               continue;
             }
-            console.log(`✅ Respuesta obtenida del modelo: ${model} (longitud: ${botResponse.length})`);
+            console.log(`✅ Respuesta obtenida del modelo: ${model} (longitud: ${botResponse.length} caracteres). ¡Más natural y fluida!`);
             break;
+          } else {
+            console.log(`⚠️ Estructura de respuesta inválida de ${model}.`);
           }
         } else {
           const errorText = await response.text();
-          console.log(`❌ Error con modelo ${model}:`, errorText);
+          console.log(`❌ Error HTTP con ${model} (código ${response.status}): ${errorText.substring(0, 200)}...`);
           lastError = errorText;
         }
       } catch (error) {
-        console.log(`❌ Error al conectar con ${model}:`, error.message);
+        console.log(`❌ Error de conexión con ${model}: ${error.message}`);
         lastError = error.message;
       }
     }
