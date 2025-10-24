@@ -1,11 +1,11 @@
-// Serverless function para Vercel que implementa el endpoint /api/chat
-// Adaptado del server.js: Incluye extracción de datos, sesiones in-memory (nota: no persisten entre invocaciones en serverless; considera Vercel KV para producción),
-// carga de PDF (usando fallback hardcodeado ya que no hay fs en serverless), SYSTEM_CONTEXT completo, validación de elegibilidad,
-// historial de conversación, fallback de modelos, y comportamiento fluido sin repeticiones.
-// Para Firebase, requiere configuración separada (agrega require si usas); aquí se incluye pero comenta si no está listo.
+// chat.js - Actualizado: Descomenta Firebase, usa el db inicializado, y asegura que guardarDatosEstudiante funcione
+// Asegúrate de que firebase.js esté en el mismo directorio y que las env vars de Vercel estén configuradas correctamente
+// (ej: FIREBASE_PROJECT_ID=egresadoschat, FIREBASE_CLIENT_EMAIL=firebase-adminsdk-fbsvc@egresadoschat.iam.gserviceaccount.com,
+// FIREBASE_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\nMIIE... (con \n escapados como \\n en Vercel))
+
 const fetch = require('node-fetch');
-require('dotenv').config(); // Si usas .env en Vercel, configúralo en dashboard
-// const db = require('./firebase'); // Descomenta y configura para guardar en Firestore
+require('dotenv').config();
+const db = require('./firebase'); // Ahora descomentado: inicializa Admin SDK
 
 // Variables globales para sesiones (in-memory; resetean por invocación en serverless)
 const conversationHistory = new Map();
@@ -214,23 +214,27 @@ function datosFaltantes(data) {
   return faltan;
 }
 
-// Función para guardar en Firebase (igual al original; descomenta db si usas)
+// Función para guardar en Firebase (descomentada y corregida: usa Admin SDK)
 async function guardarDatosEstudiante(data) {
-  // if (!db || !data || !data.nombre || !data.correo) return;
-  // try {
-  //   await db.collection('estudiantes').add({
-  //     nombre: data.nombre,
-  //     ciclo: data.ciclo || '',
-  //     correo: data.correo,
-  //     telefono: data.telefono || '',
-  //     año_egreso: data.año_egreso || '',
-  //     ultimoCurso: data.ultimoCurso || '',
-  //     fecha: new Date().toISOString()
-  //   });
-  //   console.log('✅ Datos guardados en Firebase:', data.correo);
-  // } catch (err) {
-  //   console.error('❌ Error guardando en Firebase:', err);
-  // }
+  if (!db || !data || !data.nombre || !data.correo) {
+    console.log('⚠️ No se guarda: faltan datos clave o db no inicializado');
+    return;
+  }
+  try {
+    await db.collection('estudiantes').add({
+      nombre: data.nombre,
+      ciclo: data.ciclo || '',
+      correo: data.correo,
+      telefono: data.telefono || '',
+      año_egreso: data.año_egreso || '',
+      ultimoCurso: data.ultimoCurso || '',
+      fecha: admin.firestore.FieldValue.serverTimestamp(), // Usa timestamp del servidor
+      elegible: data.elegible !== false // Incluye elegibilidad
+    });
+    console.log('✅ Datos guardados en Firebase:', data.correo);
+  } catch (err) {
+    console.error('❌ Error guardando en Firebase:', err);
+  }
 }
 
 module.exports = async (req, res) => {
@@ -445,9 +449,9 @@ Para más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinf
     currentData.interactions = (currentData.interactions || 0) + 1;
     studentData.set(sessionId, currentData);
 
-    // Guardar datos en Firestore si están disponibles
+    // Guardar datos en Firestore si están disponibles (ahora descomentado y funcional)
     if (currentData.nombre && currentData.correo) {
-      // await guardarDatosEstudiante(currentData); // Descomenta si usas Firebase
+      await guardarDatosEstudiante(currentData);
     }
 
     console.log('✅ Respuesta enviada exitosamente (longitud:', botResponse.length, ')');
