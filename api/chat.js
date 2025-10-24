@@ -1,7 +1,5 @@
-// chat.js - Versión completa corregida: Persistencia de sesiones en Firestore, extracción de ciclo mejorada (202301 -> 2023-1),
-// no pide año_egreso (asume egresados), flag anti-duplicados, y fixes de Gemini/Firebase.
-// Asegúrate de: firebase.js exporta { db, admin }, env vars configuradas (GEMINI_API_KEY, Firebase creds con \\n escapados).
-// Para WhatsApp: En el handler, setea sessionId = req.body.from (número de teléfono) para sesiones por usuario.
+// chat.js - Versión mejorada con conversaciones más naturales y contextuales
+// Mejoras: Reconocimiento de cursos actuales, flujo de conversación natural, información personalizada
 
 const fetch = require('node-fetch');
 require('dotenv').config();
@@ -91,8 +89,15 @@ GRACIAS 986 724 506 centrodeinformatica@uss.edu.pe PROGRAMA DE COMPUTACIÓN PARA
 
 INFORMACIÓN EXTRA: Deudas pendientes no afectan inscripción (independiente). Olvidé usuario/contraseña Campus/Aula: Contacta ciso.dti@uss.edu.pe o helpdesk1@uss.edu.pe. Constancias: acempresariales@uss.edu.pe. Cambio horarios: paccis@uss.edu.pe con pruebas.`;
 
-// Configuración del contexto del Centro de Informática USS (COMPLETO del original)
-const SYSTEM_CONTEXT = `Eres un asistente virtual del Centro de Informática USS en Chiclayo, Perú. Ayuda SOLO con el Programa de Computación para Egresados: sé preciso, corto y enfocado en la pregunta. ANALIZA el PDF proporcionado para responder con info exacta (ej. contenidos específicos de cursos, pasos detallados de inscripción y pago con números en círculo). Si es consulta general, lista cursos y costos upfront, explica pago/registro brevemente, y pregunta ciclo/nombre SOLO si quieren inscribirse. Usa info del PDF como fuente principal. NO textos largos; 100-200 palabras max. Al final de cada respuesta, agrega: "Para más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinformatica@uss.edu.pe".
+// Configuración del contexto del Centro de Informática USS (MEJORADO)
+const SYSTEM_CONTEXT = `Eres un asistente virtual amigable y conversacional del Centro de Informática USS en Chiclayo, Perú. Ayuda con el Programa de Computación para Egresados: sé preciso pero natural, como una conversación real. ANALIZA el PDF proporcionado para responder con información exacta. 
+
+En tus respuestas:
+1. SÉ CONVERSACIONAL Y AMABLE - Como un asesor real, no un bot robótico.
+2. PERSONALIZA según el nivel del estudiante - Si ya tiene Computación 1, reconócelo y enfoca en su progreso hacia Computación 2 y 3.
+3. INFORMACIÓN GENERAL PRIMERO - No saltes directamente a pagos sin explicar el programa.
+4. USA LENGUAJE NATURAL - Evita respuestas que suenen a plantillas.
+5. RECONOCE LA PROGRESIÓN - Felicita por cursos completados y motiva a seguir.
 
 IMPORTANTE: 
 - EXCLUSIVO para egresados pregrado hasta 2023-2 con pendiente en computación.
@@ -134,272 +139,334 @@ INFO BASE DEL PROGRAMA (EXACTA del PDF/slides con números en círculo y nuevo t
   - Yape: Ingresando tu código de alumno.
   - Aplicativo BCP: Seleccionar "Servicios Programables", Ingresar tu código de alumno.
   - Agente o Agencia BCP: Número de cuenta: 305-1552328-0-87. Nota: Desde app/agencia: 3 a 5 horas. Desde agente físico: hasta 24 horas.
-  - Campus Virtual: Accede a Gestión Financiera > Detalle Económico > Pagos con Tarjeta QR (VISA/Mastercard).
-  - Yape: Paga el servicio programado vía app Yape (ingresa código del alumno).
-  - Aplicativo BCP: Paga servicios > "Servicios Programados" > Ingresa código > Refleja en 3-5 horas.
-  - Agente o Agencia BCP: En cualquier agente/agencia BCP (cuenta: 305-1552328-0-87). Espera hasta 24 horas.
-- Metodología (con números en círculo y nuevo texto): 📚 Metodología del Curso: Aula USS (www.aulauss.edu.pe), Material de autoaprendizaje PDFs y recursos en línea, 100% virtual Acceso 24/7, Cuestionarios evaluaciones progresivas (4 cuestionarios, 30 min cada uno), Promedio = (C1 + C2 + C3 + C4)/4. 1. Aula USS. 2. 100% Virtual (24/7). 3. Material Autoaprendizaje. 4. Cuestionarios.
-- Materiales: Sílabo, Material PDF, Cuestionarios.
-- Evaluación: Promedio = (C1 + C2 + C3 + C4)/4 (4 cuestionarios, cada uno de 30 minutos; Cuestionario 1 -> C1, etc.).
-- Contactos: centrodeinformatica@uss.edu.pe | 986 724 506 | @centrodeinformaticauss (IG), Centro de Informática USS (FB/LinkedIn). Sigue para eventos.
+  - Campus Virtual: Accede a Gestión Financiera > Detalle Económico > Pagos con Tarjeta QR (VISA/Mastercard).`;
 
-EJEMPLOS CORTOS (basados en PDF/slides con números):
-- Invitación: "¡Hola! 👋 Programa 100% virtual para egresados hasta 2023-2. 📚 Cursos: 1-Word (Int-Av) S/200; 2-Excel (Bás-Int-Av) S/200; 3-SPSS/Project S/200. Registro: Ingresa Campus > 1. Trámites > 2. Programación Servicios > 3. Programa Computación Egresados USS > 4. Programar > 5. Paga > 6. Envía comprobante a centrodeinformatica@uss.edu.pe. ¿Tu ciclo? 📞 986 724 506."
-- Pagos: "💳 Pasos pagos: 1. Tarjeta QR (activa check condiciones). 2. Yape (servicios programables, código alumno). 3. BCP App (Pagar servicios > Programables, código). 4. Agente BCP (cta 305-1552328-0-87, 24h). App/agencia: 3-5h. 📧 centrodeinformatica@uss.edu.pe."
-- Inscripción: "Pasos registro: 1. Campus > Trámites. 2. Programación Servicios. 3. Programa Computación Egresados USS. 4. Programar (S/200). 5. Paga. 6. Envía comprobante. 📞 986 724 506."
-- Evaluación: "Evaluación: 4 cuestionarios (30 min cada uno), promedio (C1+C2+C3+C4)/4. 📧 centrodeinformatica@uss.edu.pe."
-- Deudas: "¡No hay problema! 😊 El programa es independiente; deudas de malla no afectan. Sigue pasos de registro. 📧 centrodeinformatica@uss.edu.pe."
-- Credenciales: "Para recuperar usuario/contraseña, contacta ciso.dti@uss.edu.pe o helpdesk1@uss.edu.pe. 📞 986 724 506."
-- Constancias: "Para constancias, contacta acempresariales@uss.edu.pe. 📞 986 724 506."
-- Cambios: "Para cambio de horarios, envía solicitud con pruebas a paccis@uss.edu.pe. Revisa para evitar cruces. 📧 centrodeinformatica@uss.edu.pe."
-
-PERSONALIDAD: Profesional, amigable, emojis. Responde en español. Mantén conversaciones naturales y fluidas, sin repetir información ya dada en el historial.`;
-
-// Función para extraer datos del estudiante (actualizada: maneja formatos de ciclo como 202301 o 2023-1)
-function extractStudentData(message) {
-  const data = {};
-  const issues = [];
-
-  const normalized = message.toLowerCase().replace(/[^\w\s@\-.:]/g, ' ').trim();
-
-  const nombreCandidates = normalized.split(/\s+/).filter(word => !word.match(/^\d/)).join(' ').match(/\b[a-záéíóúüñ]{3,}\s+[a-záéíóúüñ]{3,}\b/i);
-  if (nombreCandidates && nombreCandidates[0].split(' ').length >= 2) {
-    data.nombre = nombreCandidates[0].charAt(0).toUpperCase() + nombreCandidates[0].slice(1);
-  }
-
-  const correoMatch = message.match(/([a-zA-Z0-9._%+-]+@(?:uss\.edu\.pe|crece\.uss\.edu\.pe))/i);
-  if (correoMatch) {
-    data.correo = correoMatch[1].toLowerCase();
-  }
-
-  const telefonoMatch = message.match(/(9\d{8})/);
-  if (telefonoMatch) {
-    data.telefono = telefonoMatch[1];
-  }
-
-  // Actualizado: Maneja formatos YYYY[12] (ej: 202301) o YYYY-[12] (ej: 2023-1)
-  let cicloMatch = message.match(/(\d{4})([12])/i) || message.match(/(\d{4})[-\/]([12])/i);
-  if (cicloMatch) {
-    const year = cicloMatch[1];
-    const sem = cicloMatch[2];
-    data.ciclo = `${year}-${sem}`;
-    data.año_egreso = data.ciclo;
-    const yearNum = parseInt(year);
-    const semesterNum = parseInt(sem);
-    if (yearNum > 2023 || (yearNum === 2023 && semesterNum > 2)) {
-      issues.push('ciclo_no_elegible');
-      data.elegible = false;
-    } else {
-      data.elegible = true;
+// Función para extraer el ciclo del estudiante
+function extractCicloInfo(message) {
+  // Busca patrones como "202301", "2023-1", "2023 1", etc.
+  const cicloRegex = /(?:20\d{2}[-\s]?[1-2])|(?:20\d{2}[01][1-2])/g;
+  const matches = message.match(cicloRegex);
+  
+  if (matches && matches.length > 0) {
+    let ciclo = matches[0].replace(/\s+|-/g, '');
+    // Formatear a 2023-1 si es necesario
+    if (ciclo.length === 6) {
+      const year = ciclo.substring(0, 4);
+      const period = ciclo.substring(4, 6);
+      // Convierte 01/02 a 1/2
+      const periodNum = parseInt(period, 10);
+      ciclo = `${year}-${periodNum}`;
     }
+    return ciclo;
+  }
+  return null;
+}
+
+// Función para extraer información del estudiante del mensaje
+function extractStudentInfo(message) {
+  const info = {};
+  
+  // Extraer ciclo
+  info.ciclo = extractCicloInfo(message);
+  
+  // Extraer correo
+  const emailRegex = /[a-zA-Z0-9._%+-]+@uss\.edu\.pe/i;
+  const emailMatch = message.match(emailRegex);
+  if (emailMatch) info.correo = emailMatch[0].toLowerCase();
+  
+  // Extraer nombre (asumiendo formato "nombre apellido")
+  const nombreRegex = /(?:[a-zñáéíóú]+ [a-zñáéíóú]+(?:\s*[a-zñáéíóú]+)?)/i;
+  const nombreMatch = message.match(nombreRegex);
+  if (nombreMatch && nombreMatch[0].length > 5) info.nombre = nombreMatch[0];
+  
+  // Extraer número telefónico
+  const phoneRegex = /\b9\d{8}\b|\b[7-9]\d{8}\b/;
+  const phoneMatch = message.match(phoneRegex);
+  if (phoneMatch) info.telefono = phoneMatch[0];
+  
+  // Extraer último curso (computacion 1/2/3)
+  const cursoRegex = /computaci[oó]n\s*[123]/i;
+  const cursoMatch = message.match(cursoRegex);
+  if (cursoMatch) info.ultimoCurso = cursoMatch[0].toLowerCase();
+  
+  return info;
+}
+
+// Función para determinar el siguiente curso recomendado
+function getSiguienteCurso(cursoActual) {
+  if (!cursoActual) return "Computación 1";
+  
+  const cursoNormalizado = cursoActual.toLowerCase().replace(/\s+/g, '');
+  
+  if (cursoNormalizado.includes("1")) {
+    return "Computación 2";
+  } else if (cursoNormalizado.includes("2")) {
+    return "Computación 3";
   } else {
-    // Si no se detecta, asume elegible por defecto (egresados)
-    data.elegible = true;
+    return "Has completado todos los cursos del programa";
   }
-
-  const cursoMatch = message.match(/(?:computaci[óo]n|comp)\s*([123]|ninguno)/i);
-  if (cursoMatch) {
-    data.ultimoCurso = cursoMatch[1].toLowerCase() === 'ninguno' ? 'ninguno' : `Computación ${cursoMatch[1]}`;
-  }
-
-  if (issues.length > 0) {
-    data.issues = issues;
-  }
-
-  return data;
 }
 
-function datosFaltantes(data) {
-  const faltan = [];
-  if (!data.nombre) faltan.push('nombre completo');
-  if (!data.correo) faltan.push('correo institucional');
-  if (!data.telefono) faltan.push('número telefónico');
-  // Removido: 'año de egreso' - no se pide ya que son egresados (se asume elegible si no se proporciona)
-  if (!data.ultimoCurso) faltan.push('curso de computación actual (ej: Computación 2 o ninguno)');
-  return faltan;
+// Función para generar respuestas personalizadas basadas en el progreso del estudiante
+function generarRespuestaPersonalizada(currentData) {
+  if (!currentData.ultimoCurso) {
+    return null; // Sin curso actual, usar respuesta estándar
+  }
+  
+  const siguienteCurso = getSiguienteCurso(currentData.ultimoCurso);
+  const cursoActual = currentData.ultimoCurso.toLowerCase();
+  
+  let respuestaPersonalizada = "";
+  
+  // Si ya tiene algún curso, personalizar respuesta
+  if (cursoActual.includes("1")) {
+    respuestaPersonalizada = `¡Hola ${currentData.nombre || ''}! 😊\n\nVeo que ya has completado ${currentData.ultimoCurso}, ¡felicitaciones por este avance! 👏\n\nPara continuar con tu progreso en el Programa de Computación para Egresados, ahora puedes inscribirte en ${siguienteCurso}, que se enfoca en Microsoft Excel (niveles básico, intermedio y avanzado).\n\n¿Te gustaría recibir información detallada sobre los contenidos de ${siguienteCurso} o prefieres que te explique directamente el proceso de inscripción? También puedes inscribirte en Computación 3 si lo deseas, ya que los cursos pueden llevarse en paralelo.\n\nPara más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinformatica@uss.edu.pe.`;
+  } 
+  else if (cursoActual.includes("2")) {
+    respuestaPersonalizada = `¡Hola ${currentData.nombre || ''}! 😊\n\n¡Excelente progreso con ${currentData.ultimoCurso}! 🎉 Ya casi completas el programa.\n\nAhora puedes dar el paso final inscribiéndote en ${siguienteCurso}, que te enseñará IBM SPSS y MS Project, herramientas muy valiosas para tu carrera profesional.\n\n¿Te gustaría conocer más sobre los contenidos específicos de este último curso o prefieres que te explique directamente el proceso de inscripción?\n\nPara más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinformatica@uss.edu.pe.`;
+  }
+  
+  return respuestaPersonalizada;
 }
 
-// Función para cargar studentData desde Firestore
+// Función para cargar datos de estudiante desde Firestore
 async function loadStudentData(sessionId) {
   try {
-    const doc = await db.collection('sessions').doc(sessionId).get();
+    // Intenta cargar de Firestore primero
+    const docRef = db.collection('chatSessions').doc(sessionId);
+    const doc = await docRef.get();
+    
     if (doc.exists) {
       const data = doc.data();
-      console.log('📂 Datos cargados desde Firestore para sesión:', sessionId);
-      return data.studentData || {};
+      console.log('✅ Datos cargados de Firestore:', sessionId);
+      return data;
+    } else {
+      // Si no existe en Firestore, busca en el Map local como fallback
+      const localData = studentData.get(sessionId);
+      if (localData) {
+        console.log('✅ Datos cargados de Map local:', sessionId);
+        return localData;
+      }
+      console.log('⚠️ Sesión nueva, iniciando:', sessionId);
+      return { introSent: false };
     }
-  } catch (err) {
-    console.error('❌ Error cargando sesión:', err);
+  } catch (error) {
+    console.error('❌ Error cargando datos del estudiante:', error);
+    // Fallback a Map local si hay error
+    const localData = studentData.get(sessionId);
+    if (localData) {
+      console.log('✅ Fallback a Map local por error Firestore:', sessionId);
+      return localData;
+    }
+    return { introSent: false };
   }
-  return {};
 }
 
-// Función para guardar studentData en Firestore
+// Función para guardar datos del estudiante en Firestore
 async function saveStudentData(sessionId, data) {
   try {
-    await db.collection('sessions').doc(sessionId).set({
-      studentData: data,
-      lastActivity: admin.firestore.FieldValue.serverTimestamp(),
-      interactions: (data.interactions || 0) + 1
-    }, { merge: true });
-    console.log('💾 Sesión guardada en Firestore:', sessionId);
-  } catch (err) {
-    console.error('❌ Error guardando sesión:', err);
+    // Guarda en Firestore
+    await db.collection('chatSessions').doc(sessionId).set(data, { merge: true });
+    console.log('✅ Datos guardados en Firestore:', sessionId);
+    
+    // También actualiza el Map local como cache/fallback
+    studentData.set(sessionId, data);
+    return true;
+  } catch (error) {
+    console.error('❌ Error guardando datos en Firestore:', error);
+    // Al menos guarda en Map local como fallback
+    studentData.set(sessionId, data);
+    return false;
   }
 }
 
-// Función para guardar en Firebase (solo estudiantes, con flag anti-duplicados)
+// Función para verificar elegibilidad
+function verificarElegibilidad(ciclo) {
+  if (!ciclo) return true; // Si no hay ciclo, asumimos elegible
+  
+  try {
+    // Normalizar formato a año-periodo (ej. 2023-1)
+    let cicloNormalizado = ciclo;
+    if (ciclo.length === 6) { // Si es formato 202301
+      cicloNormalizado = `${ciclo.substring(0, 4)}-${parseInt(ciclo.substring(4, 6), 10)}`;
+    }
+    
+    // Separar año y periodo
+    const [year, period] = cicloNormalizado.split('-').map(part => parseInt(part, 10));
+    
+    // Verificar si es <= 2023-2
+    return (year < 2023) || (year === 2023 && period <= 2);
+  } catch (error) {
+    console.error('❌ Error verificando elegibilidad:', error, ciclo);
+    return true; // En caso de error, asumimos elegible
+  }
+}
+
+// Función para guardar datos del estudiante en colección "estudiantes"
 async function guardarDatosEstudiante(data) {
-  if (!db || !admin || !data || !data.nombre || !data.correo) {
-    console.log('⚠️ No se guarda estudiante: faltan datos clave');
-    return;
-  }
+  if (!data.correo) return false;
+  
   try {
-    await db.collection('estudiantes').add({
-      nombre: data.nombre,
-      ciclo: data.ciclo || '',
+    // Usar correo como ID para evitar duplicados
+    const docId = data.correo.toLowerCase().replace(/[@.]/g, '_');
+    await db.collection('estudiantes').doc(docId).set({
+      nombre: data.nombre || 'No proporcionado',
       correo: data.correo,
-      telefono: data.telefono || '',
-      año_egreso: data.año_egreso || '',
-      ultimoCurso: data.ultimoCurso || '',
-      fecha: admin.firestore.FieldValue.serverTimestamp(),
-      elegible: data.elegible !== false
-    });
-    console.log('✅ Estudiante guardado en Firestore:', data.correo);
-  } catch (err) {
-    console.error('❌ Error guardando estudiante:', err);
+      telefono: data.telefono || 'No proporcionado',
+      ciclo: data.ciclo || 'No proporcionado',
+      ultimoCurso: data.ultimoCurso || 'Ninguno',
+      fechaRegistro: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    
+    console.log('✅ Estudiante registrado/actualizado en colección:', docId);
+    return true;
+  } catch (error) {
+    console.error('❌ Error guardando estudiante en colección:', error);
+    return false;
   }
 }
 
-module.exports = async (req, res) => {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
-  }
-
+// Exportar la función principal del chatbot
+module.exports = async function handleChat(req, res) {
   try {
-    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-    if (!GEMINI_API_KEY) {
-      console.error('❌ Faltan env vars: GEMINI_API_KEY no configurada');
-      return res.status(500).json({ error: 'Falta la variable de entorno GEMINI_API_KEY. Verifica en Vercel.' });
-    }
-
-    // Para WhatsApp: Usa req.body.from como sessionId (número de teléfono); ajusta según tu webhook
-    const { message, sessionId = 'default' } = req.body || {};
-    // Ejemplo: if (req.body.from) sessionId = req.body.from;
+    console.log('📥 Solicitud recibida:', req.body);
+    
+    // Extraer datos de la solicitud
+    const { message } = req.body;
     if (!message) {
-      return res.status(400).json({ error: 'Mensaje requerido' });
+      return res.status(400).json({ error: 'Se requiere un mensaje' });
     }
-
-    // Cargar datos previos de Firestore al inicio
+    
+    // Usar sessionId de la solicitud o generar uno nuevo
+    const sessionId = req.body.sessionId || `session_${Date.now()}`;
+    
+    // Cargar datos del estudiante
     let currentData = await loadStudentData(sessionId);
-    console.log('📂 Sesión iniciada con datos previos:', Object.keys(currentData).length > 0 ? 'Sí' : 'No');
+    
+    // Verificar si es la primera interacción
+    const isFirstMessage = !currentData.introSent;
+    
+    // Extraer información del mensaje
+    const extractedInfo = extractStudentInfo(message);
+    console.log('📊 Información extraída:', extractedInfo);
+    
+    // Actualizar datos con la nueva información extraída
+    currentData = {
+      ...currentData,
+      ...extractedInfo,
+      introSent: true, // Marcar que se envió la intro
+      lastMessage: message,
+      lastUpdate: new Date().toISOString()
+    };
+    
+    // Verificar elegibilidad basado en ciclo
+    if (currentData.ciclo) {
+      currentData.elegible = verificarElegibilidad(currentData.ciclo);
+      if (!currentData.elegible) {
+        const response = `Lo siento ${currentData.nombre || ''}, el Programa de Computación para Egresados está disponible solo para estudiantes hasta el ciclo 2023-2. Para tu caso particular, te recomiendo contactar directamente a paccis@uss.edu.pe para recibir orientación sobre tus opciones.
 
-    // Extraer datos del mensaje actual (merge con previos)
-    const extractedData = extractStudentData(message);
-    currentData = { ...currentData, ...extractedData };
-    currentData.lastActivity = Date.now();
-
-    // Verificar si ya se pidió datos en esta sesión
-    const hasAskedForData = currentData.hasAskedForData || false;
-    const faltan = datosFaltantes(currentData);
-
-    // Solo pide datos si faltan MÁS DEL 50% y no se ha pedido antes
-    if (faltan.length > 2 && (!hasAskedForData || currentData.interactions < 2)) {
-      currentData.hasAskedForData = true;
-      currentData.interactions = (currentData.interactions || 0) + 1;
-
-      // Guarda el estado actualizado
-      await saveStudentData(sessionId, currentData);
-
-      return res.status(200).json({
-        response: `¡Hola! 😊 Para ayudarte mejor con el Programa de Computación para Egresados, necesito algunos datos. Envía solo lo que falta, cada uno en una línea:\n\n- ${faltan.join('\n- ')}\n\nEjemplo:\n- Nombre: Juan Pérez\n- Correo: juan@uss.edu.pe\n\nUna vez que los tengas, continuamos. 📚`,
-        sessionId,
-        studentData: currentData,
-        isEligible: false
-      });
-    }
-
-    // Determinar contexto adicional basado en elegibilidad y datos completos
-    let additionalContext = '';
-    if (currentData.ciclo && currentData.elegible === false) {
-      additionalContext = `
-      ATENCIÓN: El estudiante indicó que egresó en ${currentData.ciclo}.
-      Este ciclo NO ES ELEGIBLE para el programa (posterior a 2023-2).
-      Informa amablemente que no puede acceder y redirige a paccis@uss.edu.pe para alternativas. Mantén corto. NO inscribas.
-      `;
-      console.log('🚫 Estudiante NO elegible:', currentData.ciclo);
-    } else if (currentData.ciclo && currentData.elegible === true) {
-      additionalContext = `
-      El estudiante egresó en ${currentData.ciclo} - ES ELEGIBLE. Continúa con invitación y detalles (usa credenciales existentes; lista cursos si info general). Si faltan datos menores, pregunta suavemente.
-      `;
-      console.log('✅ Estudiante elegible:', currentData.ciclo);
-    } else {
-      additionalContext = `
-      No se detectó ciclo completo. Si es info general, lista cursos defrente. Pregunta datos solo si inscribir o faltan clave (no repitas si ya preguntado). Mantén corto.
-      `;
-    }
-
-    // Si todos los datos están completos, personaliza la respuesta SOLO la primera vez
-    const introSent = currentData.introSent || false;
-    if (faltan.length === 0) {
-      if (!introSent) {
-        additionalContext += `
-        Todos los datos del estudiante están completos: ${JSON.stringify(currentData, null, 2)}. Esta es la primera respuesta con datos completos: Saluda por nombre (ej: Hola ${currentData.nombre}! 😊), confirma elegibilidad, resume su situación (ej: Has completado Computación 1, puedes inscribirte en 2 y/o 3), y pregunta qué necesita específicamente (info general, pasos de inscripción, dudas sobre pago, etc.). Proporciona info completa y útil basada en el PDF, sin cortar oraciones.`;
-        currentData.introSent = true;
-      } else {
-        additionalContext += `
-        Datos completos ya confirmados en intro anterior. Responde directamente a la nueva pregunta de manera natural y fluida. NO repitas saludo, confirmación de elegibilidad, lista de cursos o resumen de situación a menos que sea relevante para la consulta actual. Usa el historial para referencia (ej: "Como mencioné antes sobre los pagos..."). Si faltan datos menores, pregúntalos al final suavemente. Mantén respuestas cortas y enfocadas.`;
+Para más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinformatica@uss.edu.pe.`;
+        
+        await saveStudentData(sessionId, currentData);
+        return res.status(200).json({ 
+          response,
+          sessionId,
+          studentData: currentData,
+          isEligible: false
+        });
       }
-    } else if (faltan.length > 0 && faltan.length <= 2) {
-      additionalContext += `
-      Faltan datos menores: ${faltan.join(', ')}. Pregunta suavemente por ellos al final de la respuesta, pero responde la consulta principal primero.`;
     }
-
-    // Incluir historial resumido para fluidez
-    let historySummary = '';
-    const sessionHistory = conversationHistory.get(sessionId) || [];
-    if (sessionHistory.length > 0) {
-      const recentHistory = sessionHistory.slice(-10);
-      historySummary = `\n\nHistorial reciente de la conversación (para fluidez y continuidad):\n${recentHistory.map(h => `${h.role}: ${h.content.substring(0, 100)}...`).join('\n')}`;
-      const commonTopics = recentHistory.filter(h => h.content.toLowerCase().includes('inscrip')).length > 1 ? '\nNota: Usuario ha preguntado repetidamente por inscripción; enfócate en pasos del PDF.' : '';
-      historySummary += commonTopics;
+    
+    // Guardar datos actualizados
+    await saveStudentData(sessionId, currentData);
+    
+    // Preparar contexto para la IA
+    let conversationContext = '';
+    
+    // Si es la primera interacción, usar mensaje de bienvenida
+    if (isFirstMessage) {
+      conversationContext = `[El usuario acaba de iniciar la conversación. Preséntate brevemente como asistente del Centro de Informática USS y solicita datos básicos (nombre, correo, teléfono, curso actual) para ayudarle mejor. Sé breve y amigable, no recites una lista completa de servicios aún.]`;
+    } else if (message.toLowerCase().includes('si') && (currentData.nombre && currentData.correo)) {
+      // Si el usuario responde "sí" después de dar sus datos y está pidiendo información general
+      
+      // Generar respuesta personalizada basada en su progreso (si aplica)
+      const respuestaPersonalizada = generarRespuestaPersonalizada(currentData);
+      
+      if (respuestaPersonalizada) {
+        // Si tiene curso previo, usar respuesta personalizada
+        return res.status(200).json({ 
+          response: respuestaPersonalizada,
+          sessionId,
+          studentData: currentData,
+          isEligible: currentData.elegible !== false
+        });
+      } else {
+        // Contexto para responder a "sí, quiero información general"
+        conversationContext = `[El usuario ha proporcionado sus datos (${currentData.nombre || 'sin nombre'}, ${currentData.correo || 'sin correo'}, ${currentData.telefono || 'sin teléfono'}, curso actual: ${currentData.ultimoCurso || 'ninguno'}) y ahora quiere información general del programa. 
+        
+        NO pases directamente a los pasos de pago. Primero EXPLICA el programa completo, los cursos disponibles (Computación 1, 2 y 3) con sus contenidos y costos. Después pregúntale si quiere conocer el proceso de inscripción y pago. Sé conversacional y natural. Recuerda que cada curso cuesta S/ 200. Si ya tiene algún curso (${currentData.ultimoCurso || 'ninguno'}), mencionarlo y felicitarlo por su avance.]`;
+      }
+    } else {
+      // Para cualquier otra interacción, proveer contexto con los datos del estudiante
+      conversationContext = `[El usuario tiene estos datos: ${currentData.nombre || 'sin nombre'}, ${currentData.correo || 'sin correo'}, ${currentData.telefono || 'sin teléfono'}, ciclo: ${currentData.ciclo || 'desconocido'}, curso actual: ${currentData.ultimoCurso || 'ninguno'}. 
+      
+      Si ya tiene algún curso (${currentData.ultimoCurso || 'ninguno'}), personaliza tu respuesta mencionándolo y recomendando el siguiente curso. Sé conversacional y amigable. Recuerda la progresión: Computación 1 (Word) → Computación 2 (Excel) → Computación 3 (SPSS/Project). Cada curso cuesta S/ 200. Si pregunta por proceso de inscripción o pagos, da los detalles completos.]`;
     }
-
-    // Modelos a probar
-    const modelsToTry = [
-      'gemini-2.5-flash',
-      'gemini-2.5-pro',
-      'gemini-2.5-flash-lite',
-      'gemini-2.0-flash',
-      'gemini-2.0-flash-lite'
+    
+    // Obtener historial de conversación
+    let history = conversationHistory.get(sessionId) || [];
+    
+    // Limitar historial a últimas 10 interacciones para evitar tokens excesivos
+    if (history.length > 20) {
+      history = history.slice(-20);
+    }
+    
+    // Convertir a formato de Gemini
+    const historyFormatted = history.map(msg => ({
+      role: msg.role,
+      parts: [{ text: msg.content }]
+    }));
+    
+    // Modelos a intentar en orden de preferencia
+    const models = [
+      'gemini-1.0-pro',
+      'gemini-1.5-flash',
+      'gemini-pro'
     ];
-
-    let botResponse = '';
+    
+    let botResponse = null;
     let lastError = null;
-
-    for (const model of modelsToTry) {
+    
+    // Intentar cada modelo hasta obtener respuesta
+    for (const model of models) {
       try {
-        console.log(`🤖 Probando modelo: ${model}`);
+        console.log(`🔄 Intentando con modelo: ${model}`);
         
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`,
           {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json',
+              'Content-Type': 'application/json'
             },
             body: JSON.stringify({
               contents: [
                 {
-                  parts: [
-                    {
-                      text: `${SYSTEM_CONTEXT}${additionalContext}\n\nDatos actuales del estudiante: ${JSON.stringify(currentData)}${historySummary}\n\nMensaje del usuario: ${message}\n\nSi el mensaje parece contener datos del usuario (nombre, correo, etc.), ignóralo como pregunta principal y usa los datos extraídos para personalizar. Mantén una conversación natural y fluida: responde directamente a la consulta actual, sin repetir info del historial. Analiza el PDF para detalles específicos y proporciona respuestas completas pero concisas, sin cortar oraciones.`
-                    }
-                  ]
+                  role: 'user',
+                  parts: [{ text: SYSTEM_CONTEXT }]
+                },
+                {
+                  role: 'model',
+                  parts: [{ text: 'Entendido. Seré un asistente virtual amigable y conversacional del Centro de Informática USS, enfocado en el Programa de Computación para Egresados. Personalizaré mis respuestas según el nivel del estudiante, seré natural en mi comunicación y proporcionaré información relevante y útil.' }]
+                },
+                ...historyFormatted,
+                {
+                  role: 'user',
+                  parts: [{ text: `${conversationContext}\n\nMensaje del usuario: ${message}` }]
                 }
               ],
               generationConfig: {
-                temperature: 0.5,
+                temperature: 0.7,
                 maxOutputTokens: 600,
                 topP: 0.8,
                 topK: 40
@@ -448,54 +515,72 @@ module.exports = async (req, res) => {
       }
     }
 
+    // Si ningún modelo funciona, usar respuestas de fallback personalizadas
     if (!botResponse || botResponse.length < 50) {
       console.log('⚠️ Usando fallback: Todos los modelos fallaron. Último error:', lastError);
-      const introSent = currentData.introSent || false;
-      if (introSent) {
-        botResponse = `¡Hola de nuevo! 😊 ¿En qué puedo ayudarte con el Programa de Computación para Egresados? (Ej: detalles de pago, acceso al Aula USS, o dudas específicas). Basado en lo que ya sabemos de ti, dime qué necesitas exactamente.`;
-      } else {
-        botResponse = `¡Hola ${currentData.nombre || ''}! 😊 Gracias por proporcionar tus datos. Basado en tu información (egresado ${currentData.ciclo || 'reciente'}, curso actual: ${currentData.ultimoCurso || 'ninguno'}), eres elegible para el Programa de Computación para Egresados (hasta 2023-2).
+      
+      // Personalizar fallback según el progreso del estudiante
+      if (currentData.ultimoCurso) {
+        const siguienteCurso = getSiguienteCurso(currentData.ultimoCurso);
+        
+        botResponse = `¡Hola ${currentData.nombre || ''}! 😊 
 
-📚 **Cursos disponibles (S/200 cada uno):**
-- Computación 1: Microsoft Word (Intermedio-Avanzado)
-- Computación 2: Microsoft Excel (Básico-Intermedio-Avanzado)
-- Computación 3: IBM SPSS y MS Project
+Veo que ya has completado ${currentData.ultimoCurso}. ¡Excelente progreso! 👏
 
-**Pasos para inscribirte:**
-1. Ingresa al Campus USS > Trámites > Programación de Servicios > Programa de Computación para Egresados USS > Programar (S/200).
-2. Realiza el pago (ver métodos).
-3. Envía comprobante a centrodeinformatica@uss.edu.pe.
+Para continuar con el Programa de Computación para Egresados, ahora puedes inscribirte en ${siguienteCurso}.
 
-💳 **Métodos de pago:** 1. Tarjeta QR (activa check condiciones). 2. Yape (servicios programables, código alumno). 3. BCP App (Pagar servicios > Programables, código). 4. Agente BCP (cta 305-1552328-0-87, 24h). App/agencia: 3-5h.
-
-**Evaluación:** 4 cuestionarios (30 min cada uno), promedio (C1+C2+C3+C4)/4.
-
-¿En qué curso quieres inscribirte o qué duda tienes? (Ej: pasos detallados, acceso Aula USS).
+¿Te gustaría conocer más detalles sobre los contenidos de este curso o prefieres que te explique el proceso de inscripción directamente?
 
 Para más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinformatica@uss.edu.pe.`;
+      } 
+      else if (currentData.introSent) {
+        botResponse = `¡Hola de nuevo ${currentData.nombre || ''}! 😊 
+
+El Programa de Computación para Egresados incluye tres cursos, cada uno a S/ 200:
+
+📚 Computación 1: Microsoft Word (Intermedio - Avanzado)
+📚 Computación 2: Microsoft Excel (Básico - Intermedio - Avanzado)
+📚 Computación 3: IBM SPSS y MS Project
+
+¿En cuál de estos cursos estás interesado? ¿O prefieres que te explique el proceso de inscripción?
+
+Para más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinformatica@uss.edu.pe.`;
+      } else {
+        botResponse = `¡Hola! 👋 Bienvenido al Centro de Informática de la Universidad Señor de Sipán. Soy tu asistente virtual y estoy aquí para ayudarte con consultas sobre el Programa de Computación para Egresados.
+
+Para ayudarte mejor, ¿podrías proporcionarme algunos datos?
+- Tu nombre completo
+- Correo institucional
+- Número telefónico
+- Y si has llevado algún curso de computación (Computación 1, 2 o ninguno)
+
+Una vez que tenga esta información, podré orientarte mejor sobre tus opciones.`;
       }
     }
 
-    // Guardar conversación (usa Map local como fallback; opcional: persiste en Firestore si necesitas)
+    // Guardar conversación
     let updatedHistory = conversationHistory.get(sessionId) || [];
     updatedHistory.push({ role: 'user', content: message });
     updatedHistory.push({ role: 'assistant', content: botResponse });
+    
+    // Limitar historial a últimas 30 interacciones
     if (updatedHistory.length > 30) {
       updatedHistory = updatedHistory.slice(-30);
     }
+    
     conversationHistory.set(sessionId, updatedHistory);
 
     // Actualizar interacciones
     currentData.interactions = (currentData.interactions || 0) + 1;
 
-    // Guarda el estado actualizado en Firestore
+    // Guardar estado actualizado en Firestore
     await saveStudentData(sessionId, currentData);
 
-    // Guardar estudiante solo si datos completos y no se ha guardado antes (flag)
+    // Guardar estudiante solo si datos completos y no se ha guardado antes
     if (currentData.nombre && currentData.correo && !currentData.studentSaved) {
       await guardarDatosEstudiante(currentData);
       currentData.studentSaved = true;
-      await saveStudentData(sessionId, currentData); // Re-guarda con flag
+      await saveStudentData(sessionId, currentData);
     }
 
     console.log('✅ Respuesta enviada (sesión persistida, longitud:', botResponse.length, ')');
@@ -512,19 +597,17 @@ Para más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinf
     
     const sessionId = req.body?.sessionId || 'default';
     let currentData = {}; // Fallback vacío
+    
     try {
       currentData = await loadStudentData(sessionId); // Intenta cargar si existe
     } catch (loadErr) {
       console.error('❌ Error cargando en catch:', loadErr);
     }
     
-    const introSent = currentData.introSent || false;
-    let errorResponse = '';
-    if (introSent) {
-      errorResponse = '¡Ups! Problema técnico rápido. ¿Qué duda tienes ahora sobre el programa? (Ej: pagos o evaluación).';
-    } else {
-      errorResponse = '¡Hola! 😊 Hubo un problema técnico temporal. Mientras, aquí va info rápida del Programa: 100% virtual para egresados hasta 2023-2. Cursos S/200: Word, Excel, SPSS/Project. Inscríbete: Campus > Trámites > Programación > Programa Egresados > Programar > Paga > Envía a centrodeinformatica@uss.edu.pe. Evaluación: 4 cuestionarios (30 min c/u). ¿Qué necesitas? Para más, 📧 centrodeinformatica@uss.edu.pe 📞 986 724 506';
-    }
+    // Respuesta de error más natural y conversacional
+    const errorResponse = currentData.nombre 
+      ? `¡Hola ${currentData.nombre}! Parece que estamos teniendo un pequeño problema técnico en este momento. ¿Podrías intentarlo de nuevo en unos instantes? Si tienes una consulta urgente, te recomiendo contactar directamente al Centro de Informática al 📞 986 724 506 o por correo a 📧 centrodeinformatica@uss.edu.pe.` 
+      : `¡Hola! Estamos experimentando algunas dificultades técnicas temporales. Por favor, intenta de nuevo en unos momentos. Si necesitas asistencia inmediata, contacta al Centro de Informática al 📞 986 724 506 o por correo a 📧 centrodeinformatica@uss.edu.pe.`;
     
     // Intenta guardar en catch si hay datos
     if (sessionId && currentData) {
