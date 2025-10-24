@@ -1,10 +1,15 @@
+// chat.js - Versión completa corregida: Persistencia de sesiones en Firestore, extracción de ciclo mejorada (202301 -> 2023-1),
+// no pide año_egreso (asume egresados), flag anti-duplicados, y fixes de Gemini/Firebase.
+// Asegúrate de: firebase.js exporta { db, admin }, env vars configuradas (GEMINI_API_KEY, Firebase creds con \\n escapados).
+// Para WhatsApp: En el handler, setea sessionId = req.body.from (número de teléfono) para sesiones por usuario.
+
 const fetch = require('node-fetch');
 require('dotenv').config();
-const { db, admin } = require('./firebase'); // Ahora descomentado: inicializa Admin SDK y exporta admin
+const { db, admin } = require('./firebase'); // Inicializa Admin SDK y exporta admin
 
-// Variables globales para sesiones (in-memory; resetean por invocación en serverless)
+// Variables globales para sesiones (in-memory como fallback; principal es Firestore)
 const conversationHistory = new Map();
-const studentData = new Map();
+const studentData = new Map(); // Fallback local, pero usa Firestore para persistencia
 
 // Contenido del PDF (fallback hardcodeado, ya que no hay fs en serverless)
 const pdfContent = `PROGRAMA COMPUTACION PARA EGRESADOS
@@ -150,7 +155,6 @@ EJEMPLOS CORTOS (basados en PDF/slides con números):
 
 PERSONALIDAD: Profesional, amigable, emojis. Responde en español. Mantén conversaciones naturales y fluidas, sin repetir información ya dada en el historial.`;
 
-// Función para extraer datos del estudiante (igual al original)
 // Función para extraer datos del estudiante (actualizada: maneja formatos de ciclo como 202301 o 2023-1)
 function extractStudentData(message) {
   const data = {};
@@ -215,20 +219,39 @@ function datosFaltantes(data) {
   return faltan;
 }
 
-function datosFaltantes(data) {
-  const faltan = [];
-  if (!data.nombre) faltan.push('nombre completo');
-  if (!data.correo) faltan.push('correo institucional');
-  if (!data.telefono) faltan.push('número telefónico');
-  if (!data.año_egreso) faltan.push('año de egreso (ej: 2022-1)');
-  if (!data.ultimoCurso) faltan.push('curso de computación actual (ej: Computación 2 o ninguno)');
-  return faltan;
+// Función para cargar studentData desde Firestore
+async function loadStudentData(sessionId) {
+  try {
+    const doc = await db.collection('sessions').doc(sessionId).get();
+    if (doc.exists) {
+      const data = doc.data();
+      console.log('📂 Datos cargados desde Firestore para sesión:', sessionId);
+      return data.studentData || {};
+    }
+  } catch (err) {
+    console.error('❌ Error cargando sesión:', err);
+  }
+  return {};
 }
 
-// Función para guardar en Firebase (descomentada y corregida: usa Admin SDK)
+// Función para guardar studentData en Firestore
+async function saveStudentData(sessionId, data) {
+  try {
+    await db.collection('sessions').doc(sessionId).set({
+      studentData: data,
+      lastActivity: admin.firestore.FieldValue.serverTimestamp(),
+      interactions: (data.interactions || 0) + 1
+    }, { merge: true });
+    console.log('💾 Sesión guardada en Firestore:', sessionId);
+  } catch (err) {
+    console.error('❌ Error guardando sesión:', err);
+  }
+}
+
+// Función para guardar en Firebase (solo estudiantes, con flag anti-duplicados)
 async function guardarDatosEstudiante(data) {
   if (!db || !admin || !data || !data.nombre || !data.correo) {
-    console.log('⚠️ No se guarda: faltan datos clave o db/admin no inicializado');
+    console.log('⚠️ No se guarda estudiante: faltan datos clave');
     return;
   }
   try {
@@ -239,12 +262,12 @@ async function guardarDatosEstudiante(data) {
       telefono: data.telefono || '',
       año_egreso: data.año_egreso || '',
       ultimoCurso: data.ultimoCurso || '',
-      fecha: admin.firestore.FieldValue.serverTimestamp(), // Usa timestamp del servidor
-      elegible: data.elegible !== false // Incluye elegibilidad
+      fecha: admin.firestore.FieldValue.serverTimestamp(),
+      elegible: data.elegible !== false
     });
-    console.log('✅ Datos guardados en Firebase:', data.correo);
+    console.log('✅ Estudiante guardado en Firestore:', data.correo);
   } catch (err) {
-    console.error('❌ Error guardando en Firebase:', err);
+    console.error('❌ Error guardando estudiante:', err);
   }
 }
 
@@ -260,17 +283,21 @@ module.exports = async (req, res) => {
       return res.status(500).json({ error: 'Falta la variable de entorno GEMINI_API_KEY. Verifica en Vercel.' });
     }
 
+    // Para WhatsApp: Usa req.body.from como sessionId (número de teléfono); ajusta según tu webhook
     const { message, sessionId = 'default' } = req.body || {};
+    // Ejemplo: if (req.body.from) sessionId = req.body.from;
     if (!message) {
       return res.status(400).json({ error: 'Mensaje requerido' });
     }
 
-    // Extraer datos del estudiante del mensaje actual
+    // Cargar datos previos de Firestore al inicio
+    let currentData = await loadStudentData(sessionId);
+    console.log('📂 Sesión iniciada con datos previos:', Object.keys(currentData).length > 0 ? 'Sí' : 'No');
+
+    // Extraer datos del mensaje actual (merge con previos)
     const extractedData = extractStudentData(message);
-    let currentData = studentData.get(sessionId) || {};
     currentData = { ...currentData, ...extractedData };
     currentData.lastActivity = Date.now();
-    studentData.set(sessionId, currentData);
 
     // Verificar si ya se pidió datos en esta sesión
     const hasAskedForData = currentData.hasAskedForData || false;
@@ -280,7 +307,9 @@ module.exports = async (req, res) => {
     if (faltan.length > 2 && (!hasAskedForData || currentData.interactions < 2)) {
       currentData.hasAskedForData = true;
       currentData.interactions = (currentData.interactions || 0) + 1;
-      studentData.set(sessionId, currentData);
+
+      // Guarda el estado actualizado
+      await saveStudentData(sessionId, currentData);
 
       return res.status(200).json({
         response: `¡Hola! 😊 Para ayudarte mejor con el Programa de Computación para Egresados, necesito algunos datos. Envía solo lo que falta, cada uno en una línea:\n\n- ${faltan.join('\n- ')}\n\nEjemplo:\n- Nombre: Juan Pérez\n- Correo: juan@uss.edu.pe\n\nUna vez que los tengas, continuamos. 📚`,
@@ -317,7 +346,6 @@ module.exports = async (req, res) => {
         additionalContext += `
         Todos los datos del estudiante están completos: ${JSON.stringify(currentData, null, 2)}. Esta es la primera respuesta con datos completos: Saluda por nombre (ej: Hola ${currentData.nombre}! 😊), confirma elegibilidad, resume su situación (ej: Has completado Computación 1, puedes inscribirte en 2 y/o 3), y pregunta qué necesita específicamente (info general, pasos de inscripción, dudas sobre pago, etc.). Proporciona info completa y útil basada en el PDF, sin cortar oraciones.`;
         currentData.introSent = true;
-        studentData.set(sessionId, currentData);
       } else {
         additionalContext += `
         Datos completos ya confirmados en intro anterior. Responde directamente a la nueva pregunta de manera natural y fluida. NO repitas saludo, confirmación de elegibilidad, lista de cursos o resumen de situación a menos que sea relevante para la consulta actual. Usa el historial para referencia (ej: "Como mencioné antes sobre los pagos..."). Si faltan datos menores, pregúntalos al final suavemente. Mantén respuestas cortas y enfocadas.`;
@@ -337,7 +365,7 @@ module.exports = async (req, res) => {
       historySummary += commonTopics;
     }
 
-    // Modelos a probar (corregido: solo el path, como en original)
+    // Modelos a probar
     const modelsToTry = [
       'gemini-2.5-flash',
       'gemini-2.5-pro',
@@ -448,11 +476,10 @@ Para más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinf
       }
     }
 
-    // Guardar conversación
+    // Guardar conversación (usa Map local como fallback; opcional: persiste en Firestore si necesitas)
     let updatedHistory = conversationHistory.get(sessionId) || [];
     updatedHistory.push({ role: 'user', content: message });
     updatedHistory.push({ role: 'assistant', content: botResponse });
-    
     if (updatedHistory.length > 30) {
       updatedHistory = updatedHistory.slice(-30);
     }
@@ -460,18 +487,22 @@ Para más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinf
 
     // Actualizar interacciones
     currentData.interactions = (currentData.interactions || 0) + 1;
-    studentData.set(sessionId, currentData);
 
-    // Guardar datos en Firestore si están disponibles (ahora descomentado y funcional)
-    if (currentData.nombre && currentData.correo) {
+    // Guarda el estado actualizado en Firestore
+    await saveStudentData(sessionId, currentData);
+
+    // Guardar estudiante solo si datos completos y no se ha guardado antes (flag)
+    if (currentData.nombre && currentData.correo && !currentData.studentSaved) {
       await guardarDatosEstudiante(currentData);
+      currentData.studentSaved = true;
+      await saveStudentData(sessionId, currentData); // Re-guarda con flag
     }
 
-    console.log('✅ Respuesta enviada exitosamente (longitud:', botResponse.length, ')');
+    console.log('✅ Respuesta enviada (sesión persistida, longitud:', botResponse.length, ')');
 
     return res.status(200).json({ 
       response: botResponse,
-      sessionId: sessionId,
+      sessionId,
       studentData: currentData,
       isEligible: currentData.elegible !== false
     });
@@ -480,13 +511,24 @@ Para más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinf
     console.error('❌ Error en el servidor:', error);
     
     const sessionId = req.body?.sessionId || 'default';
-    const currentData = studentData.get(sessionId) || {};
+    let currentData = {}; // Fallback vacío
+    try {
+      currentData = await loadStudentData(sessionId); // Intenta cargar si existe
+    } catch (loadErr) {
+      console.error('❌ Error cargando en catch:', loadErr);
+    }
+    
     const introSent = currentData.introSent || false;
     let errorResponse = '';
     if (introSent) {
       errorResponse = '¡Ups! Problema técnico rápido. ¿Qué duda tienes ahora sobre el programa? (Ej: pagos o evaluación).';
     } else {
       errorResponse = '¡Hola! 😊 Hubo un problema técnico temporal. Mientras, aquí va info rápida del Programa: 100% virtual para egresados hasta 2023-2. Cursos S/200: Word, Excel, SPSS/Project. Inscríbete: Campus > Trámites > Programación > Programa Egresados > Programar > Paga > Envía a centrodeinformatica@uss.edu.pe. Evaluación: 4 cuestionarios (30 min c/u). ¿Qué necesitas? Para más, 📧 centrodeinformatica@uss.edu.pe 📞 986 724 506';
+    }
+    
+    // Intenta guardar en catch si hay datos
+    if (sessionId && currentData) {
+      await saveStudentData(sessionId, currentData);
     }
     
     return res.status(500).json({ 
