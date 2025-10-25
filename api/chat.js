@@ -229,6 +229,43 @@ function extractStudentInfo(message) {
   return info;
 }
 
+// Nueva función para detectar feedback (sí/no)
+function detectFeedback(message) {
+  const lowerMessage = message.toLowerCase().trim();
+  const yesResponses = ['sí', 'si', 'yes', 'yep', 'ok', 'bueno', 'gracias'];
+  const noResponses = ['no', 'nop', 'nope', 'mal', 'pésimo'];
+
+  if (yesResponses.some(yes => lowerMessage.includes(yes))) {
+    return 'positive';
+  } else if (noResponses.some(no => lowerMessage.includes(no))) {
+    return 'negative';
+  }
+  return null;
+}
+
+// Función para guardar feedback en Firestore (nueva colección 'feedbacks')
+async function guardarFeedback(sessionId, feedbackType, currentData) {
+  if (!feedbackType) return false;
+  
+  try {
+    const docId = `${sessionId}_${Date.now()}`; // ID único por sesión y timestamp
+    await db.collection('feedbacks').doc(docId).set({
+      sessionId,
+      feedbackType, // 'positive' o 'negative'
+      nombre: currentData.nombre || 'Anónimo',
+      correo: currentData.correo || 'No proporcionado',
+      interactions: currentData.interactions || 0,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+    console.log(`✅ Feedback guardado: ${feedbackType} para sesión ${sessionId}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Error guardando feedback:', error);
+    return false;
+  }
+}
+
 // Función para determinar el siguiente curso recomendado
 function getSiguienteCurso(cursoActual) {
   if (!cursoActual) return "Computación 1";
@@ -361,8 +398,17 @@ module.exports = async function handleChat(req, res) {
     // Verificar si es la primera interacción
     const isFirstMessage = !currentData.introSent;
     
-    // Extraer información del mensaje
-    const extractedInfo = extractStudentInfo(message);
+    // Detectar si este mensaje es un feedback (sí/no)
+    const feedbackType = detectFeedback(message);
+    let feedbackHandled = false;
+    if (feedbackType) {
+      await guardarFeedback(sessionId, feedbackType, currentData);
+      feedbackHandled = true;
+      console.log(`🎯 Feedback detectado y guardado: ${feedbackType}`);
+    }
+    
+    // Extraer información del mensaje (solo si no es puro feedback)
+    const extractedInfo = feedbackHandled ? {} : extractStudentInfo(message);
     console.log('📊 Información extraída:', extractedInfo);
     
     // Actualizar datos con la nueva información extraída
@@ -398,8 +444,13 @@ Para más consultas o trámites, contacta al 📞 986 724 506 o 📧 centrodeinf
     // Preparar contexto para la IA
     let conversationContext = '';
     
+    // Si es feedback, agregar contexto para que la IA lo reconozca y responda naturalmente
+    if (feedbackHandled) {
+      const feedbackText = feedbackType === 'positive' ? 'sí' : 'no';
+      conversationContext = `[El usuario acaba de responder al feedback con "${feedbackText}". Reconoce su respuesta de manera amigable (ej: "¡Gracias por tu feedback positivo!" o "Lo siento si no fue lo que esperabas, ¿cómo puedo mejorar?"), y luego continúa con la conversación normal si hay más contexto, o pregunta si tiene más dudas.]`;
+    }
     // Si es la primera interacción, usar mensaje de bienvenida
-    if (isFirstMessage) {
+    else if (isFirstMessage) {
       conversationContext = `[El usuario acaba de iniciar la conversación con "${message}". Preséntate brevemente como asistente del Centro de Informática USS y solicita datos básicos (nombre, correo, teléfono, curso actual) para ayudarle mejor. Sé breve y amigable, no recites una lista completa de servicios aún.]`;
     } 
     // Si el mensaje es "explicame el proceso" o similar
@@ -633,6 +684,19 @@ Para ayudarte mejor, ¿podrías proporcionarme algunos datos?
 
 Una vez que tenga esta información, podré orientarte mejor sobre tus opciones.`;
       }
+    }
+
+    // Agregar pregunta de feedback al final de cada respuesta (excepto si es la primera interacción o puro feedback)
+    if (!isFirstMessage && !feedbackHandled) {
+      botResponse += `\n\n¿Te gustó esta respuesta? Di 'sí' o 'no' para ayudarnos a mejorar. 😊`;
+    }
+
+    // Si es feedback, agregar un acknowledgment al inicio de la respuesta generada
+    if (feedbackHandled) {
+      const ack = feedbackType === 'positive' 
+        ? '¡Gracias por tu feedback positivo! Me alegra que te haya sido útil. ' 
+        : 'Lo siento si no fue lo que esperabas. ¿Cómo puedo ayudarte mejor? ';
+      botResponse = ack + botResponse;
     }
 
     // Guardar conversación
