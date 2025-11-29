@@ -7,10 +7,11 @@ function App() {
   const [messages, setMessages] = useState([
     { 
       type: 'bot', 
-      text: '¡Hola! 👋 Bienvenido al Centro de Informática USS.\n\nPara ayudarte mejor, ¿eres egresado de pregrado de la USS hasta el ciclo 2023-2?',
+      text: '¡Hola! 👋 Bienvenido al Centro de Informática USS.\n\n¿Eres egresado de pregrado de la USS?',
       buttons: [
-        { text: 'Sí, soy egresado hasta 2023-2', value: 'elegible_si' },
-        { text: 'No, soy de ciclo posterior', value: 'elegible_no' }
+        { text: 'Sí, soy egresado', value: 'es_egresado' },
+        { text: 'No soy egresado', value: 'no_egresado' },
+        { text: '❓ Tengo otra consulta', value: 'otra_consulta' }
       ]
     }
   ]);
