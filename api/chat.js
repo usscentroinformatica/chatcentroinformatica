@@ -7,41 +7,50 @@ const { db, admin } = require('./firebase');
 const pdfContent = `PROGRAMA COMPUTACION PARA EGRESADOS... [contenido completo]`;
 
 // Configuración del contexto mejorado
-const SYSTEM_CONTEXT = `Eres un asistente virtual del Centro de Informática USS. Tu objetivo es ayudar con el Programa de Computación para Egresados de manera conversacional y eficiente.
+const SYSTEM_CONTEXT = `Eres un asistente virtual amigable y conversacional del Centro de Informática USS. Ayudas con el Programa de Computación para Egresados.
+
+IMPORTANTE - REGLAS DE CONVERSACIÓN:
+1. NO pidas datos personales (nombre, correo, teléfono) a menos que sea absolutamente necesario
+2. Responde directamente a la pregunta del usuario de manera natural
+3. Sé conciso pero informativo (máximo 150 palabras)
+4. Usa emojis moderadamente para dar calidez
+5. Si el usuario hace una pregunta específica, ve directo al punto
+6. NO uses formatos de listas largas ni bullet points excesivos
 
 INFORMACIÓN DEL PROGRAMA:
-- Dirigido a: Egresados pregrado USS hasta 2023-2 con pendiente acreditación en cursos de computación.
-- Modalidad: 100% virtual (Aula USS: www.aulauss.edu.pe), autoaprendizaje, 24/7.
+- Dirigido a: Egresados pregrado USS hasta 2023-2 con pendiente acreditación en cursos de computación
+- Modalidad: 100% virtual (Aula USS: www.aulauss.edu.pe), autoaprendizaje, 24/7
 - Cursos disponibles:
   📚 Computación 1: Microsoft Word (Intermedio - Avanzado) - S/ 200
   📚 Computación 2: Microsoft Excel (Básico - Intermedio - Avanzado) - S/ 200
   📚 Computación 3: IBM SPSS y MS Project - S/ 200
 
-PROCESO DE REGISTRO:
-1. Ingresa al campus USS → Trámites → PROGRAMACION DE SERVICIOS
+PROCESO DE INSCRIPCIÓN (solo mencionar si preguntan):
+1. Campus USS → Trámites → PROGRAMACIÓN DE SERVICIOS
 2. PROGRAMA DE COMPUTACIÓN PARA EGRESADOS USS → Programar
-3. Realizar pago (S/ 200)
+3. Pagar S/ 200
 4. Enviar comprobante a: centrodeinformatica@uss.edu.pe
 
-MÉTODOS DE PAGO:
+MÉTODOS DE PAGO (solo mencionar si preguntan):
 - Campus Virtual: Tarjeta/QR (Visa/Mastercard)
 - Yape: Servicios programables (código alumno)
-- BCP App: Servicios Programables (refleja en 3-5 horas)
-- Agente BCP: Cuenta 305-1552328-0-87 (refleja en 24h)
+- BCP App: Servicios Programables (3-5 horas)
+- Agente BCP: Cuenta 305-1552328-0-87 (24h)
 
-REGLAS DE CONVERSACIÓN:
-1. Sé conversacional y amigable, no robótico
-2. Personaliza según datos del estudiante
-3. No repitas exactamente la misma respuesta
-4. Usa emojis moderadamente para dar calidez
-5. Si el usuario hace preguntas fuera del flujo de botones, responde naturalmente
-
-CONTACTOS:
+CONTACTOS (solo mencionar si preguntan):
 📧 centrodeinformatica@uss.edu.pe
 📞 986 724 506
-🔧 Soporte técnico: ciso.dti@uss.edu.pe / helpdesk1@uss.edu.pe
-📋 Constancias: acempresariales@uss.edu.pe
-📚 Cambios académicos: paccis@uss.edu.pe`;
+
+EJEMPLOS DE RESPUESTAS NATURALES:
+Pregunta: "¿Cuánto cuesta?"
+Respuesta: "Cada curso cuesta S/ 200. Son 3 cursos en total: Computación 1 (Word), Computación 2 (Excel) y Computación 3 (SPSS y MS Project). ¿Te interesa alguno en específico?"
+
+Pregunta: "¿Cómo me inscribo?"
+Respuesta: "Es sencillo: entras al Campus USS, vas a Trámites > Programación de Servicios > seleccionas el Programa de Computación para Egresados, lo programas y pagas S/ 200. Luego envías el comprobante a centrodeinformatica@uss.edu.pe. ¿Necesitas ayuda con algún paso?"
+
+Pregunta: "¿Qué aprendo en Computación 1?"
+Respuesta: "En Computación 1 aprendes Microsoft Word a nivel intermedio-avanzado: formato avanzado, estilos y plantillas profesionales, tablas de contenido, control de cambios y trabajo colaborativo. Es 100% virtual y a tu ritmo. ¿Quieres saber más detalles?"`;
+
 
 // Función para cargar sesión desde Firestore
 async function loadSession(sessionId) {
@@ -193,9 +202,9 @@ async function getAIResponse(message, sessionData) {
     'gemini-1.5-pro'
   ];
   
-  // Preparar historial para contexto
+  // Preparar historial para contexto (solo últimos 6 mensajes para mantener respuestas concisas)
   const history = sessionData.conversationHistory || [];
-  const recentHistory = history.slice(-10); // Últimos 10 mensajes
+  const recentHistory = history.slice(-6);
   
   const historyText = recentHistory
     .map(h => `${h.role === 'user' ? 'Usuario' : 'Asistente'}: ${h.content}`)
@@ -203,25 +212,17 @@ async function getAIResponse(message, sessionData) {
   
   const contextualPrompt = `${SYSTEM_CONTEXT}
 
-DATOS DEL USUARIO:
-${sessionData.userData.nombre ? `Nombre: ${sessionData.userData.nombre}` : 'Nombre: No proporcionado'}
-${sessionData.userData.correo ? `Correo: ${sessionData.userData.correo}` : 'Correo: No proporcionado'}
-${sessionData.userData.telefono ? `Teléfono: ${sessionData.userData.telefono}` : 'Teléfono: No proporcionado'}
-${sessionData.userData.elegible !== undefined ? `Elegible: ${sessionData.userData.elegible ? 'Sí' : 'No'}` : ''}
-${sessionData.userData.cursoSeleccionado ? `Curso de interés: ${sessionData.userData.cursoSeleccionado}` : ''}
-
 HISTORIAL RECIENTE:
-${historyText}
+${historyText || 'Sin historial previo'}
 
-MENSAJE ACTUAL DEL USUARIO: ${message}
+MENSAJE DEL USUARIO: ${message}
 
 IMPORTANTE: 
-- Responde de manera natural y conversacional
-- Si el usuario hace una pregunta específica, respóndela directamente
-- No repitas información que ya le hayas dado antes
-- Personaliza tu respuesta usando los datos disponibles
-- Mantén tus respuestas concisas pero informativas (máximo 200 palabras)
-- Si pregunta por proceso, métodos de pago, o información específica, sé claro y estructurado`;
+- NO pidas datos personales innecesariamente
+- Responde DIRECTAMENTE a la pregunta en máximo 150 palabras
+- Sé conversacional y natural, como un humano
+- NO uses listas largas ni formatos complejos
+- Si preguntan algo específico, ve al grano sin rodeos`;
 
   for (const model of models) {
     try {
@@ -240,8 +241,8 @@ IMPORTANTE:
               }
             ],
             generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 500,
+              temperature: 0.8,
+              maxOutputTokens: 400,
               topP: 0.9,
               topK: 40
             },
@@ -259,8 +260,10 @@ IMPORTANTE:
         const data = await response.json();
         if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
           const text = data.candidates[0].content.parts[0].text.trim();
-          if (text.length > 50) {
-            console.log(`✅ Respuesta obtenida de ${model}`);
+          
+          // Verificar que la respuesta sea útil (no muy corta ni muy larga)
+          if (text.length > 30 && text.length < 800) {
+            console.log(`✅ Respuesta obtenida de ${model} (${text.length} caracteres)`);
             return text;
           }
         }
@@ -277,67 +280,141 @@ IMPORTANTE:
 function getFallbackResponse(message, userData) {
   const lowerMsg = message.toLowerCase();
   
-  // Preguntas sobre proceso
-  if (lowerMsg.includes('proceso') || lowerMsg.includes('inscri') || lowerMsg.includes('registr')) {
-    return `📋 **PROCESO DE INSCRIPCIÓN**
+  // Saludos
+  if (['hola', 'buenos días', 'buenas tardes', 'buenas noches', 'hey', 'hi'].some(s => lowerMsg.includes(s))) {
+    return `¡Hola! 😊 Soy tu asistente del Centro de Informática USS. Estoy aquí para ayudarte con el Programa de Computación para Egresados. ¿En qué puedo ayudarte?`;
+  }
+  
+  // Preguntas sobre costo
+  if (lowerMsg.includes('cuanto cuesta') || lowerMsg.includes('precio') || lowerMsg.includes('costo')) {
+    return `Cada curso cuesta S/ 200. Son 3 cursos disponibles:
 
-1️⃣ Ingresa al Campus USS con tus credenciales
-2️⃣ Ve a "Trámites"
-3️⃣ Selecciona "PROGRAMACIÓN DE SERVICIOS"
-4️⃣ Elige "PROGRAMA DE COMPUTACIÓN PARA EGRESADOS USS"
-5️⃣ Haz clic en "Programar"
-6️⃣ Realiza el pago de S/ 200
-7️⃣ Envía el comprobante a: centrodeinformatica@uss.edu.pe
+📚 Computación 1 (Word) - S/ 200
+📚 Computación 2 (Excel) - S/ 200  
+📚 Computación 3 (SPSS/MS Project) - S/ 200
 
-¿Necesitas información sobre los métodos de pago?`;
+Todos son 100% virtuales con acceso 24/7. ¿Te interesa alguno en específico?`;
+  }
+  
+  // Preguntas sobre proceso/inscripción
+  if (lowerMsg.includes('proceso') || lowerMsg.includes('inscri') || lowerMsg.includes('registr') || lowerMsg.includes('matricul')) {
+    return `Para inscribirte es muy sencillo:
+
+1. Entra al Campus USS con tus credenciales
+2. Ve a Trámites > Programación de Servicios
+3. Selecciona "Programa de Computación para Egresados USS"
+4. Programa el curso que deseas
+5. Paga S/ 200 por tu método preferido
+6. Envía tu comprobante a centrodeinformatica@uss.edu.pe
+
+¿Necesitas ayuda con algún paso en particular?`;
   }
   
   // Preguntas sobre pagos
-  if (lowerMsg.includes('pago') || lowerMsg.includes('pagar') || lowerMsg.includes('cuanto cuesta')) {
-    return `💳 **MÉTODOS DE PAGO** (S/ 200 por curso)
+  if (lowerMsg.includes('pago') || lowerMsg.includes('pagar') || lowerMsg.includes('yape') || lowerMsg.includes('bcp')) {
+    return `Puedes pagar de 4 formas:
 
-1. **Campus Virtual**: Tarjeta/QR (Visa/Mastercard)
-2. **Yape**: Servicios programables + código de alumno
-3. **BCP App**: Servicios Programables (3-5 horas)
-4. **Agente BCP**: Cuenta 305-1552328-0-87 (24 horas)
+💳 Campus Virtual: Con tarjeta o QR (Visa/Mastercard)
+📱 Yape: En servicios programables con tu código de alumno
+🏦 App BCP: En "Servicios Programables" (se refleja en 3-5 horas)
+🏪 Agente BCP: Cuenta 305-1552328-0-87 (se refleja en 24 horas)
 
-¿Hay algo más en lo que pueda ayudarte?`;
+¿Tienes alguna preferencia de pago?`;
   }
   
-  // Preguntas sobre cursos
-  if (lowerMsg.includes('curso') || lowerMsg.includes('computacion')) {
-    return `📚 **CURSOS DISPONIBLES** (S/ 200 c/u)
+  // Preguntas sobre cursos en general
+  if ((lowerMsg.includes('curso') || lowerMsg.includes('computacion')) && !lowerMsg.match(/computaci[oó]n\s*[123]/)) {
+    return `Tenemos 3 cursos disponibles, todos a S/ 200 c/u:
 
-**Computación 1**: Microsoft Word Intermedio-Avanzado
-• Formato avanzado y estilos
-• Plantillas profesionales
-• Tablas de contenido
+📝 **Computación 1**: Word Intermedio-Avanzado
+📊 **Computación 2**: Excel Básico-Avanzado  
+📈 **Computación 3**: SPSS y MS Project
 
-**Computación 2**: Microsoft Excel Básico-Avanzado
-• Fórmulas y funciones
-• Tablas dinámicas
-• Análisis de datos
+Todos son 100% virtuales, con material disponible 24/7 y a tu propio ritmo. ¿Sobre cuál quieres saber más?`;
+  }
+  
+  // Computación 1 específico
+  if (lowerMsg.match(/computaci[oó]n\s*1/) || lowerMsg.includes('word')) {
+    return `En **Computación 1** aprendes Microsoft Word a nivel intermedio-avanzado:
 
-**Computación 3**: IBM SPSS y MS Project
-• Análisis estadístico
-• Gestión de proyectos
+• Formato y edición avanzada
+• Estilos y plantillas profesionales
+• Tablas de contenido e índices
+• Control de cambios y trabajo colaborativo
 
-¿En cuál estás interesado${userData.nombre ? ', ' + userData.nombre : ''}?`;
+Costo: S/ 200 | 100% virtual | 4 evaluaciones
+
+¿Te gustaría inscribirte o necesitas más información?`;
+  }
+  
+  // Computación 2 específico
+  if (lowerMsg.match(/computaci[oó]n\s*2/) || lowerMsg.includes('excel')) {
+    return `En **Computación 2** dominas Microsoft Excel desde básico hasta avanzado:
+
+• Fórmulas y funciones avanzadas
+• Tablas dinámicas y análisis de datos
+• Gráficos profesionales
+• Macros básicas
+
+Costo: S/ 200 | 100% virtual | 4 evaluaciones
+
+¿Quieres saber cómo inscribirte?`;
+  }
+  
+  // Computación 3 específico
+  if (lowerMsg.match(/computaci[oó]n\s*3/) || lowerMsg.includes('spss') || lowerMsg.includes('project')) {
+    return `En **Computación 3** aprendes dos herramientas profesionales:
+
+📊 **IBM SPSS**: Análisis estadístico avanzado
+📋 **MS Project**: Gestión profesional de proyectos
+
+Costo: S/ 200 | 100% virtual | 4 evaluaciones
+
+¿Te interesa este curso?`;
+  }
+  
+  // Preguntas sobre modalidad
+  if (lowerMsg.includes('virtual') || lowerMsg.includes('presencial') || lowerMsg.includes('horario')) {
+    return `Los cursos son 100% virtuales a través del Aula USS (www.aulauss.edu.pe). No hay horarios fijos, avanzas a tu propio ritmo con acceso 24/7 al material.
+
+Evaluación: 4 cuestionarios de 30 minutos cada uno.
+
+¿Tienes alguna otra duda sobre la modalidad?`;
+  }
+  
+  // Preguntas sobre elegibilidad
+  if (lowerMsg.includes('elegible') || lowerMsg.includes('puedo llevar') || lowerMsg.includes('requisito')) {
+    return `El programa es para egresados de pregrado de la USS hasta el ciclo 2023-2 que tienen pendiente la acreditación en cursos de computación.
+
+Si eres de ciclo 2024-1 o posterior, debes contactar a paccis@uss.edu.pe para orientación.
+
+¿Eres egresado hasta 2023-2?`;
+  }
+  
+  // Contactos
+  if (lowerMsg.includes('contacto') || lowerMsg.includes('telefono') || lowerMsg.includes('correo')) {
+    return `Puedes contactarnos por:
+
+📧 centrodeinformatica@uss.edu.pe
+📞 986 724 506
+
+🔧 Soporte técnico: ciso.dti@uss.edu.pe
+📋 Constancias: acempresariales@uss.edu.pe
+📚 Trámites académicos: paccis@uss.edu.pe
+
+¿Necesitas ayuda con algo más?`;
   }
   
   // Respuesta genérica
-  return `Hola${userData.nombre ? ' ' + userData.nombre : ''}. Estoy aquí para ayudarte con el Programa de Computación para Egresados USS.
+  return `Estoy aquí para ayudarte con el Programa de Computación para Egresados USS. 
 
 Puedo ayudarte con:
-• Información sobre los cursos
+• Información sobre los cursos (Word, Excel, SPSS/Project)
 • Proceso de inscripción
 • Métodos de pago
 • Requisitos y elegibilidad
 
-¿Qué te gustaría saber?
-
-📧 centrodeinformatica@uss.edu.pe
-📞 986 724 506`;
+¿Qué te gustaría saber?`;
 }
 
 // Exportar función principal del chatbot
