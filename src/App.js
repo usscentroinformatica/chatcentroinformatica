@@ -1,25 +1,29 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Moon, Sun, Mic } from 'lucide-react';
+import { Send, Bot, User, Moon, Sun, Mic, CheckCircle, XCircle } from 'lucide-react';
 
 function App() {
-  // Generar sessionId único en cada recarga (F5 = sesión nueva)
   const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
   const [showSplash, setShowSplash] = useState(true);
   const [messages, setMessages] = useState([
-    { type: 'bot', text: '¡Hola! 👋 Bienvenido al Centro de Informática de la Universidad Señor de Sipán. Soy tu asistente virtual y estoy aquí para ayudarte con consultas sobre nuestros servicios informáticos. ¿En qué puedo asistirte?' }
+    { 
+      type: 'bot', 
+      text: '¡Hola! 👋 Bienvenido al Centro de Informática USS.\n\nPara ayudarte mejor, ¿eres egresado de pregrado de la USS hasta el ciclo 2023-2?',
+      buttons: [
+        { text: 'Sí, soy egresado hasta 2023-2', value: 'elegible_si' },
+        { text: 'No, soy de ciclo posterior', value: 'elegible_no' }
+      ]
+    }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState(null);
+  const [currentStep, setCurrentStep] = useState('elegibilidad');
+  const [userData, setUserData] = useState({});
   const messagesEndRef = useRef(null);
 
-  // Configuración de API URL para desarrollo local y producción
-  const API_URL =
-    process.env.NODE_ENV === 'production'
-      ? '/api/chat'
-      : 'http://localhost:5000/api/chat';
+  const API_URL = process.env.NODE_ENV === 'production' ? '/api/chat' : 'http://localhost:5000/api/chat';
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -35,7 +39,6 @@ function App() {
       setDarkMode(true);
     }
 
-    // Inicializar reconocimiento de voz
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const recognitionInstance = new SpeechRecognition();
@@ -44,29 +47,22 @@ function App() {
       recognitionInstance.interimResults = true;
       recognitionInstance.lang = 'es-ES';
       
-      recognitionInstance.onstart = () => {
-        setIsListening(true);
-      };
+      recognitionInstance.onstart = () => setIsListening(true);
       
       recognitionInstance.onresult = (event) => {
         let finalTranscript = '';
-        
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const transcript = event.results[i][0].transcript;
           if (event.results[i].isFinal) {
             finalTranscript += transcript;
           }
         }
-        
         if (finalTranscript) {
           setInput(prev => prev + finalTranscript);
         }
       };
       
-      recognitionInstance.onend = () => {
-        setIsListening(false);
-      };
-      
+      recognitionInstance.onend = () => setIsListening(false);
       recognitionInstance.onerror = (event) => {
         console.error('Error de reconocimiento de voz:', event.error);
         setIsListening(false);
@@ -86,55 +82,250 @@ function App() {
     let formatted = text.replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold">$1</strong>');
     formatted = formatted.replace(/^\* (.+)$/gm, '<span class="flex items-start gap-2 my-1"><span class="text-blue-600 dark:text-blue-400 font-bold">•</span><span>$1</span></span>');
     formatted = formatted.replace(/^(\d+)\. (.+)$/gm, '<span class="flex items-start gap-2 my-1"><span class="text-blue-600 dark:text-blue-400 font-bold">$1.</span><span>$2</span></span>');
-    formatted = formatted.replace(/^([1-9]️⃣) (.+)$/gm, '<span class="flex items-start gap-2 my-2"><span class="text-xl">$1</span><span>$2</span></span>');
-    formatted = formatted.replace(/^### (.+)$/gm, '<h3 class="font-bold text-lg mt-3 mb-1 text-blue-700 dark:text-blue-300">$1</h3>');
-    formatted = formatted.replace(/^## (.+)$/gm, '<h2 class="font-bold text-xl mt-3 mb-2 text-blue-800 dark:text-blue-200">$1</h2>');
     formatted = formatted.replace(/\n\n/g, '<br/><br/>');
     formatted = formatted.replace(/\n/g, '<br/>');
     return formatted;
   };
 
-  // NUEVO: Función para manejar click en botones (envía el value como mensaje)
-  const handleOptionClick = async (optionValue) => {
-    setInput('');  // Limpia input
-    await handleSendMessage(optionValue);  // Envía como mensaje
+  const handleButtonClick = async (buttonValue, buttonText) => {
+    // Agregar mensaje del usuario con el botón presionado
+    const userMessage = { type: 'user', text: buttonText };
+    setMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
+
+    // Procesar según el flujo
+    let botResponse = '';
+    let nextButtons = [];
+
+    try {
+      switch (buttonValue) {
+        case 'elegible_si':
+          setUserData(prev => ({ ...prev, elegible: true }));
+          setCurrentStep('datos_personales');
+          botResponse = '¡Perfecto! Eres elegible para el programa.\n\nAhora necesito algunos datos para continuar. ¿Cuál es tu nombre completo?';
+          nextButtons = [
+            { text: 'Prefiero escribirlo', value: 'escribir_nombre' }
+          ];
+          break;
+
+        case 'elegible_no':
+          setUserData(prev => ({ ...prev, elegible: false }));
+          botResponse = 'Entiendo. El Programa de Computación para Egresados está disponible solo para estudiantes hasta el ciclo 2023-2.\n\nPara tu caso, te recomiendo contactar a:\n📧 paccis@uss.edu.pe\n📞 986 724 506';
+          nextButtons = [
+            { text: 'Tengo otra consulta', value: 'otra_consulta' }
+          ];
+          break;
+
+        case 'escribir_nombre':
+          botResponse = 'Por favor, escribe tu nombre completo en el cuadro de texto:';
+          setCurrentStep('esperando_nombre');
+          break;
+
+        case 'confirmar_datos':
+          setCurrentStep('seleccion_curso');
+          botResponse = `Excelente, ${userData.nombre}. Ahora, ¿en qué curso estás interesado?\n\n📚 Cursos disponibles (S/ 200 cada uno):`;
+          nextButtons = [
+            { text: '📝 Computación 1 - Word (Intermedio-Avanzado)', value: 'curso_1' },
+            { text: '📊 Computación 2 - Excel (Básico-Avanzado)', value: 'curso_2' },
+            { text: '📈 Computación 3 - SPSS y MS Project', value: 'curso_3' },
+            { text: 'Ver detalles de todos los cursos', value: 'info_cursos' }
+          ];
+          break;
+
+        case 'curso_1':
+        case 'curso_2':
+        case 'curso_3':
+          const cursoNumero = buttonValue.split('_')[1];
+          const cursos = {
+            '1': { nombre: 'Computación 1', contenido: 'Microsoft Word (Intermedio - Avanzado)' },
+            '2': { nombre: 'Computación 2', contenido: 'Microsoft Excel (Básico - Intermedio - Avanzado)' },
+            '3': { nombre: 'Computación 3', contenido: 'IBM SPSS y MS Project' }
+          };
+          
+          setUserData(prev => ({ ...prev, cursoSeleccionado: cursos[cursoNumero].nombre }));
+          setCurrentStep('confirmacion_curso');
+          
+          botResponse = `Has seleccionado: **${cursos[cursoNumero].nombre}**\n${cursos[cursoNumero].contenido}\n\n💰 Costo: S/ 200\n📚 100% Virtual\n⏰ Acceso 24/7\n📝 4 evaluaciones de 30 min c/u\n\n¿Deseas continuar con el proceso de inscripción?`;
+          nextButtons = [
+            { text: '✅ Sí, continuar con inscripción', value: 'ver_proceso' },
+            { text: '🔄 Elegir otro curso', value: 'cambiar_curso' },
+            { text: 'ℹ️ Más información del curso', value: 'info_curso_detalle' }
+          ];
+          break;
+
+        case 'info_cursos':
+          botResponse = `📚 **CURSOS DISPONIBLES**\n\n**Computación 1** (S/ 200)\n• Microsoft Word Intermedio-Avanzado\n• Formato avanzado, estilos, plantillas\n• Tablas de contenido\n• Control de cambios\n\n**Computación 2** (S/ 200)\n• Microsoft Excel Básico-Avanzado\n• Fórmulas y funciones\n• Tablas dinámicas\n• Macros básicas\n\n**Computación 3** (S/ 200)\n• IBM SPSS (análisis estadístico)\n• MS Project (gestión de proyectos)\n\n¿En cuál estás interesado?`;
+          nextButtons = [
+            { text: 'Computación 1', value: 'curso_1' },
+            { text: 'Computación 2', value: 'curso_2' },
+            { text: 'Computación 3', value: 'curso_3' }
+          ];
+          break;
+
+        case 'ver_proceso':
+          setCurrentStep('proceso_inscripcion');
+          botResponse = `📋 **PROCESO DE INSCRIPCIÓN**\n\n1️⃣ Ingresa al Campus USS con tus credenciales\n2️⃣ Ve a "Trámites"\n3️⃣ Selecciona "PROGRAMACIÓN DE SERVICIOS"\n4️⃣ Elige "PROGRAMA DE COMPUTACIÓN PARA EGRESADOS USS"\n5️⃣ Haz clic en "Programar"\n6️⃣ Realiza el pago de S/ 200\n7️⃣ Envía el comprobante a:\n📧 centrodeinformatica@uss.edu.pe\n\n¿Necesitas información sobre los métodos de pago?`;
+          nextButtons = [
+            { text: '💳 Ver métodos de pago', value: 'metodos_pago' },
+            { text: '✅ Todo claro, gracias', value: 'finalizar' },
+            { text: '❓ Tengo una duda', value: 'escribir_duda' }
+          ];
+          break;
+
+        case 'metodos_pago':
+          botResponse = `💳 **MÉTODOS DE PAGO**\n\n1. **Campus Virtual - Gestión Financiera**\n   • Tarjeta Visa/Mastercard\n   • Billetera digital / QR\n\n2. **Yape**\n   • Servicios programables\n   • Ingresa tu código de alumno\n\n3. **Aplicativo BCP**\n   • Pagar servicios\n   • "Servicios Programables"\n   • Se refleja en 3-5 horas\n\n4. **Agente/Agencia BCP**\n   • Cuenta: 305-1552328-0-87\n   • Se refleja en hasta 24 horas\n\n¿Te queda alguna duda?`;
+          nextButtons = [
+            { text: '✅ Todo claro', value: 'finalizar' },
+            { text: '🔄 Ver proceso nuevamente', value: 'ver_proceso' },
+            { text: '❓ Hacer una pregunta', value: 'escribir_duda' }
+          ];
+          break;
+
+        case 'cambiar_curso':
+          setCurrentStep('seleccion_curso');
+          botResponse = '¿En qué curso estás interesado?';
+          nextButtons = [
+            { text: 'Computación 1 - Word', value: 'curso_1' },
+            { text: 'Computación 2 - Excel', value: 'curso_2' },
+            { text: 'Computación 3 - SPSS/Project', value: 'curso_3' }
+          ];
+          break;
+
+        case 'finalizar':
+          botResponse = `¡Perfecto, ${userData.nombre}! 🎉\n\nResumen de tu consulta:\n✅ Curso: ${userData.cursoSeleccionado}\n💰 Costo: S/ 200\n\nRecuerda:\n📧 centrodeinformatica@uss.edu.pe\n📞 986 724 506\n\n¿Hay algo más en lo que pueda ayudarte?`;
+          nextButtons = [
+            { text: 'No, eso es todo. Gracias', value: 'despedida' },
+            { text: 'Tengo otra consulta', value: 'otra_consulta' }
+          ];
+          break;
+
+        case 'despedida':
+          botResponse = '¡Excelente! Gracias por contactarnos. ¡Éxitos en tu curso! 🎓\n\nSi necesitas más ayuda, no dudes en escribirnos.';
+          break;
+
+        case 'otra_consulta':
+          botResponse = '¿En qué más puedo ayudarte? Escribe tu consulta:';
+          setCurrentStep('consulta_libre');
+          break;
+
+        case 'escribir_duda':
+          botResponse = 'Por favor, escribe tu duda en el cuadro de texto y te ayudaré a resolverla:';
+          setCurrentStep('consulta_libre');
+          break;
+
+        default:
+          // Para botones personalizados o flujos especiales
+          await handleSend(buttonText);
+          return;
+      }
+
+      const botMessage = { type: 'bot', text: botResponse, buttons: nextButtons };
+      setMessages(prev => [...prev, botMessage]);
+    } catch (error) {
+      console.error('Error procesando botón:', error);
+      const errorMessage = { 
+        type: 'bot', 
+        text: 'Lo siento, hubo un error. Por favor intenta nuevamente.'
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleSendMessage = async (msg = input) => {
-    if (!msg.trim() || isLoading) return;
+  const handleSend = async (messageText) => {
+    const textToSend = messageText || input.trim();
+    if (!textToSend || isLoading) return;
 
-    const userMessage = { type: 'user', text: msg };
+    const userMessage = { type: 'user', text: textToSend };
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
 
     try {
+      // Lógica especial según el paso actual
+      if (currentStep === 'esperando_nombre') {
+        // Guardar nombre y pedir correo
+        setUserData(prev => ({ ...prev, nombre: textToSend }));
+        setCurrentStep('esperando_correo');
+        
+        const botMessage = { 
+          type: 'bot', 
+          text: `Mucho gusto, ${textToSend}. ¿Cuál es tu correo institucional (@uss.edu.pe)?`,
+          buttons: []
+        };
+        setMessages(prev => [...prev, botMessage]);
+        setIsLoading(false);
+        return;
+      }
+
+      if (currentStep === 'esperando_correo') {
+        // Validar formato de correo
+        const emailRegex = /@uss\.edu\.pe$/i;
+        if (!emailRegex.test(textToSend)) {
+          const botMessage = { 
+            type: 'bot', 
+            text: 'Por favor ingresa un correo institucional válido que termine en @uss.edu.pe',
+            buttons: []
+          };
+          setMessages(prev => [...prev, botMessage]);
+          setIsLoading(false);
+          return;
+        }
+
+        setUserData(prev => ({ ...prev, correo: textToSend }));
+        setCurrentStep('esperando_telefono');
+        
+        const botMessage = { 
+          type: 'bot', 
+          text: '¿Cuál es tu número de teléfono?',
+          buttons: [
+            { text: 'Prefiero no proporcionar', value: 'skip_telefono' }
+          ]
+        };
+        setMessages(prev => [...prev, botMessage]);
+        setIsLoading(false);
+        return;
+      }
+
+      if (currentStep === 'esperando_telefono') {
+        setUserData(prev => ({ ...prev, telefono: textToSend }));
+        setCurrentStep('confirmar_datos_usuario');
+        
+        const botMessage = { 
+          type: 'bot', 
+          text: `Perfecto. Confirma tus datos:\n\n👤 Nombre: ${userData.nombre}\n📧 Correo: ${userData.correo}\n📱 Teléfono: ${textToSend}\n\n¿Los datos son correctos?`,
+          buttons: [
+            { text: '✅ Sí, continuar', value: 'confirmar_datos' },
+            { text: '✏️ Corregir datos', value: 'corregir_datos' }
+          ]
+        };
+        setMessages(prev => [...prev, botMessage]);
+        setIsLoading(false);
+        return;
+      }
+
+      // Consulta libre - enviar al backend
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          message: msg,
-          sessionId: sessionId
+          message: textToSend,
+          sessionId: sessionId,
+          userData: userData
         }),
       });
 
-      // ✅ NUEVO: Verifica el status antes de parsear
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error del servidor:', errorText);
-        throw new Error(`Error ${response.status}: El servidor tuvo un problema`);
+        throw new Error(`Error ${response.status}`);
       }
 
       const data = await response.json();
 
       if (data.response) {
-        const botMessage = { 
-          type: 'bot', 
-          text: data.response,
-          options: data.options || null  // NUEVO: Guarda opciones para renderizar
-        };
+        const botMessage = { type: 'bot', text: data.response };
         setMessages(prev => [...prev, botMessage]);
       } else {
         throw new Error(data.error || 'Error en la respuesta');
@@ -143,7 +334,7 @@ function App() {
       console.error('Error:', error);
       const errorMessage = { 
         type: 'bot', 
-        text: 'Lo siento, hubo un problema al procesar tu consulta.\n\nContacta a:\n📧 centrodeinformatica@uss.edu.pe\n📱 986 724 506' 
+        text: 'Lo siento, hubo un problema. Contacta a:\n📧 centrodeinformatica@uss.edu.pe\n📱 986 724 506' 
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
@@ -154,7 +345,7 @@ function App() {
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSendMessage();
+      handleSend();
     }
   };
 
@@ -164,7 +355,7 @@ function App() {
 
   const toggleVoiceRecognition = () => {
     if (!recognition) {
-      alert('Tu navegador no soporta reconocimiento de voz. Prueba con Chrome o Edge.');
+      alert('Tu navegador no soporta reconocimiento de voz.');
       return;
     }
 
@@ -175,90 +366,39 @@ function App() {
     }
   };
 
-  // Splash Screen Component
   if (showSplash) {
     return (
       <div className="min-h-screen relative overflow-hidden bg-green-700">
-        {/* Animated background elements */}
         <div className="absolute inset-0">
           <div className="absolute top-20 left-10 w-72 h-72 bg-white/10 rounded-full blur-3xl animate-pulse"></div>
           <div className="absolute bottom-20 right-10 w-96 h-96 bg-green-600/20 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-white/8 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
-        </div>
-        
-        {/* Floating particles */}
-        <div className="absolute inset-0">
-          <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-white/60 rounded-full animate-ping"></div>
-          <div className="absolute top-3/4 left-3/4 w-1 h-1 bg-green-300/80 rounded-full animate-ping" style={{animationDelay: '0.5s'}}></div>
-          <div className="absolute top-1/2 left-1/6 w-1.5 h-1.5 bg-white/70 rounded-full animate-ping" style={{animationDelay: '1.5s'}}></div>
-          <div className="absolute top-1/6 right-1/4 w-1 h-1 bg-blue-400/60 rounded-full animate-ping" style={{animationDelay: '2.5s'}}></div>
         </div>
         
         <div className="relative z-10 min-h-screen flex items-center justify-center p-8">
           <div className="text-center max-w-md mx-auto">
-            {/* Logo/Robot container */}
             <div className="relative mb-12">
-              {/* Outer glow ring */}
-              <div className="absolute inset-0 w-40 h-40 mx-auto rounded-full bg-green-600 opacity-25 animate-spin" style={{animationDuration: '8s'}}></div>
-              
-              {/* Robot container */}
               <div className="relative w-32 h-32 mx-auto">
-                <div className="w-full h-full rounded-full bg-white shadow-2xl border-4 border-green-500/50 flex items-center justify-center backdrop-blur-lg">
-                  <Bot className="w-16 h-16 text-green-700 drop-shadow-lg animate-bounce" />
+                <div className="w-full h-full rounded-full bg-white shadow-2xl border-4 border-green-500/50 flex items-center justify-center">
+                  <Bot className="w-16 h-16 text-green-700 animate-bounce" />
                 </div>
-                
-                {/* Status indicators */}
-                <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full border-4 border-white shadow-lg animate-pulse flex items-center justify-center">
-                  <div className="w-3 h-3 bg-white rounded-full"></div>
-                </div>
-                
-                {/* Floating mini elements */}
-                <div className="absolute -top-6 -left-4 w-4 h-4 bg-green-400 rounded-full animate-bounce opacity-80" style={{animationDelay: '0.5s'}}></div>
-                <div className="absolute -bottom-4 -right-6 w-3 h-3 bg-white rounded-full animate-bounce opacity-70" style={{animationDelay: '1s'}}></div>
               </div>
             </div>
             
-            {/* Title with gradient text */}
-            <div className="mb-6">
-              <h1 className="text-5xl md:text-6xl font-black text-white mb-3 drop-shadow-2xl">
-                Asistente USS
-              </h1>
-              <div className="w-24 h-1 bg-white mx-auto rounded-full"></div>
-            </div>
+            <h1 className="text-5xl md:text-6xl font-black text-white mb-3 drop-shadow-2xl">
+              Asistente USS
+            </h1>
             
-            {/* Subtitle */}
-            <p className="text-green-100 text-xl font-light mb-12 leading-relaxed">
-              Tu asistente inteligente del
-              <br />
-              <span className="font-semibold text-white">
-                Centro de Informática USS
-              </span>
+            <p className="text-green-100 text-xl font-light mb-12">
+              Tu asistente inteligente del<br />
+              <span className="font-semibold text-white">Centro de Informática USS</span>
             </p>
             
-            {/* Interactive start button */}
             <button 
               onClick={startChat}
-              className="group relative bg-white hover:bg-green-50 text-green-700 font-bold text-lg px-10 py-5 rounded-2xl shadow-2xl hover:shadow-white/25 transition-all duration-300 hover:scale-110 active:scale-95 transform"
+              className="group bg-white hover:bg-green-50 text-green-700 font-bold text-lg px-10 py-5 rounded-2xl shadow-2xl hover:scale-110 transition-all"
             >
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  <Mic className="w-6 h-6 group-hover:animate-pulse" />
-                  <div className="absolute inset-0 bg-white/20 rounded-full animate-ping opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                </div>
-                <span>Comenzar Chat</span>
-              </div>
-              
-              {/* Button glow effect */}
-              <div className="absolute inset-0 rounded-2xl bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
+              Comenzar Chat
             </button>
-            
-            {/* Feature hints */}
-            <div className="mt-8 flex justify-center space-x-6 text-blue-100 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                <span>Reconocimiento de voz</span>
-              </div>              
-            </div>
           </div>
         </div>
       </div>
@@ -267,247 +407,144 @@ function App() {
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${
-      darkMode 
-        ? 'bg-gradient-to-br from-gray-900 to-gray-800' 
-        : 'bg-gradient-to-br from-green-700 via-green-600 to-green-800'
+      darkMode ? 'bg-gradient-to-br from-gray-900 to-gray-800' : 'bg-gradient-to-br from-green-700 to-green-800'
     }`}>
-      {/* Elementos animados de fondo similar al splash */}
-      {!darkMode && (
-        <>
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute top-20 left-10 w-32 h-32 bg-white/5 rounded-full blur-3xl animate-pulse"></div>
-            <div className="absolute bottom-20 right-10 w-48 h-48 bg-green-500/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
-            <div className="absolute top-1/2 left-1/3 w-24 h-24 bg-white/3 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
-          </div>
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute top-1/4 right-1/4 w-1 h-1 bg-white/40 rounded-full animate-ping"></div>
-            <div className="absolute bottom-1/3 left-1/4 w-0.5 h-0.5 bg-green-300/60 rounded-full animate-ping" style={{animationDelay: '0.5s'}}></div>
-            <div className="absolute top-2/3 right-1/6 w-1 h-1 bg-white/50 rounded-full animate-ping" style={{animationDelay: '1.5s'}}></div>
-          </div>
-        </>
-      )}
-      
-      {/* Contenedor del chat con fondo blanco */}
       <div className={`flex flex-col h-screen max-w-4xl mx-auto relative z-10 ${
-        darkMode 
-          ? 'bg-gray-800 shadow-2xl' 
-          : 'bg-white shadow-2xl'
-      } md:my-4 md:rounded-2xl md:h-[calc(100vh-2rem)] overflow-hidden`}>
-      {/* Header */}
-      <div className={`shadow-sm border-b p-4 transition-colors duration-300 ${
-        darkMode 
-          ? 'bg-gray-800 border-gray-700' 
-          : 'bg-white border-gray-200'
-      }`}>
-        {/* Mobile status bar - Solo botón de tema */}
-        <div className="flex md:hidden items-center justify-end mb-4">
-          <button className="p-2" onClick={toggleDarkMode}>
-            {darkMode ? (
-              <Sun className="w-5 h-5 text-yellow-400" />
-            ) : (
-              <Moon className="w-5 h-5 text-gray-600" />
-            )}
-          </button>
-        </div>
+        darkMode ? 'bg-gray-800' : 'bg-white'
+      } md:my-4 md:rounded-2xl md:h-[calc(100vh-2rem)] overflow-hidden shadow-2xl`}>
         
-        {/* Chat Header */}
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="w-12 h-12 rounded-full bg-green-700 flex items-center justify-center shadow-lg">
-              <Bot className="w-7 h-7 text-white" />
+        {/* Header */}
+        <div className={`p-4 border-b ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <div className="w-12 h-12 rounded-full bg-green-700 flex items-center justify-center">
+                <Bot className="w-7 h-7 text-white" />
+              </div>
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white"></div>
             </div>
-            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white"></div>
-          </div>
-          <div className="flex-1">
-            <h1 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Centro de Informática USS</h1>
-            <p className="text-sm text-green-500 font-medium">En línea</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button className={`p-2 rounded-full transition-colors duration-200 hidden md:block ${
-              darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
-            }`} onClick={toggleDarkMode}>
+            <div className="flex-1">
+              <h1 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                Centro de Informática USS
+              </h1>
+              <p className="text-sm text-green-500 font-medium">En línea</p>
+            </div>
+            <button onClick={toggleDarkMode} className="p-2">
               {darkMode ? <Sun className="w-5 h-5 text-yellow-400" /> : <Moon className="w-5 h-5 text-gray-600" />}
             </button>
           </div>
         </div>
-      </div>
 
-      {/* Voice Recording Indicator */}
-      {isListening && (
-        <div className="bg-red-500 text-white px-4 py-2 text-center text-sm font-medium animate-pulse">
-          <div className="flex items-center justify-center gap-2">
-            <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
-            Escuchando... Habla ahora
-            <div className="w-2 h-2 bg-white rounded-full animate-ping"></div>
-          </div>
-        </div>
-      )}
-
-      {/* Messages Area */}
-      <div className={`chat-messages flex-1 overflow-y-auto p-4 space-y-4 md:p-6 transition-colors duration-300 ${
-        darkMode 
-          ? 'bg-gray-800' 
-          : 'bg-gray-50'
-      }`}>
-        {messages.map((message, index) => (
-          <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-            {/* Bot messages */}
-            {message.type === 'bot' && (
-              <div className="flex flex-col items-start gap-3 max-w-[85%] md:max-w-[70%] group">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-green-700 flex items-center justify-center shadow-lg flex-shrink-0 group-hover:shadow-green-600/40 group-hover:scale-105 transition-all duration-300">
-                    <Bot className="w-5 h-5 md:w-6 md:h-6 text-white" />
+        {/* Messages */}
+        <div className={`flex-1 overflow-y-auto p-4 space-y-4 ${darkMode ? 'bg-gray-800' : 'bg-gray-50'}`}>
+          {messages.map((message, index) => (
+            <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+              {message.type === 'bot' && (
+                <div className="flex items-start gap-3 max-w-[85%]">
+                  <div className="w-10 h-10 rounded-full bg-green-700 flex items-center justify-center flex-shrink-0">
+                    <Bot className="w-6 h-6 text-white" />
                   </div>
-                  <div className={`rounded-2xl rounded-tl-md p-4 md:p-5 backdrop-blur-sm border-2 group-hover:shadow-xl group-hover:scale-[1.02] transition-all duration-300 ${
-                    darkMode 
-                      ? 'bg-gradient-to-br from-gray-800/95 to-gray-700/90 border-green-400/40 text-gray-100 shadow-lg shadow-green-400/25' 
-                      : 'bg-gradient-to-br from-green-50/90 to-white/95 border-green-400/60 text-gray-800 shadow-lg shadow-green-600/20'
-                  } relative overflow-hidden`}>
-                    <div className={`absolute inset-0 bg-gradient-to-r ${
-                      darkMode 
-                        ? 'from-green-500/5 to-transparent' 
-                        : 'from-green-100/50 to-transparent'
-                    } pointer-events-none`}></div>
-                    <div className="relative z-10">
+                  <div>
+                    <div className={`rounded-2xl p-4 ${
+                      darkMode ? 'bg-gray-700 text-gray-100' : 'bg-white text-gray-800'
+                    }`}>
                       <div 
-                        className={`text-sm md:text-base leading-relaxed ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}
+                        className="text-sm leading-relaxed"
                         dangerouslySetInnerHTML={{ __html: formatMessage(message.text) }}
                       />
                     </div>
+                    
+                    {/* Botones de respuesta rápida */}
+                    {message.buttons && message.buttons.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {message.buttons.map((button, btnIndex) => (
+                          <button
+                            key={btnIndex}
+                            onClick={() => handleButtonClick(button.value, button.text)}
+                            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105 ${
+                              darkMode 
+                                ? 'bg-green-600 hover:bg-green-500 text-white' 
+                                : 'bg-green-600 hover:bg-green-700 text-white'
+                            } shadow-md hover:shadow-lg`}
+                          >
+                            {button.text}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
-                
-                {/* NUEVO: Renderiza botones si hay options */}
-                {message.options && message.options.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2 pl-11 md:pl-13">
-                    {message.options.map((option, optIndex) => (
-                      <button
-                        key={optIndex}
-                        onClick={() => handleOptionClick(option.value)}
-                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 hover:scale-105 active:scale-95 shadow-md ${
-                          darkMode
-                            ? 'bg-gradient-to-r from-green-600/80 to-green-700/80 text-white hover:from-green-500/90 shadow-green-500/30'
-                            : 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-400 shadow-green-400/40'
-                        }`}
-                      >
-                        {option.text}
-                      </button>
-                    ))}
+              )}
+              
+              {message.type === 'user' && (
+                <div className="flex items-start gap-3 max-w-[85%] flex-row-reverse">
+                  <div className="w-10 h-10 rounded-full bg-green-700 flex items-center justify-center">
+                    <User className="w-6 h-6 text-white" />
                   </div>
-                )}
-              </div>
-            )}
-            
-            {/* User messages */}
-            {message.type === 'user' && (
-              <div className="flex items-start gap-3 max-w-[85%] md:max-w-[70%] flex-row-reverse group">
-                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-green-700 flex items-center justify-center shadow-lg flex-shrink-0 group-hover:shadow-green-600/40 group-hover:scale-105 transition-all duration-300">
-                  <User className="w-5 h-5 md:w-6 md:h-6 text-white" />
-                </div>
-                <div className="bg-green-700 rounded-2xl rounded-tr-md p-4 md:p-5 shadow-lg shadow-green-700/25 backdrop-blur-sm group-hover:shadow-xl group-hover:shadow-green-700/40 group-hover:scale-[1.02] transition-all duration-300 border border-green-600/50">
-                  <div className="text-white text-sm md:text-base leading-relaxed">
+                  <div className="bg-green-700 rounded-2xl p-4 text-white text-sm">
                     {message.text}
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
-        ))}
-        
-        
-        {/* Loading indicator */}
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="flex items-start gap-3 max-w-[80%] group">
-              <div className="w-8 h-8 rounded-full bg-green-700 flex items-center justify-center shadow-lg animate-pulse">
-                <Bot className="w-5 h-5 text-white" />
-              </div>
-              <div className={`rounded-2xl rounded-tl-md p-4 md:p-5 backdrop-blur-sm border-2 shadow-lg transition-all duration-300 ${
-                darkMode 
-                  ? 'bg-gray-800/90 border-green-400/30 shadow-green-400/20' 
-                  : 'bg-white/95 border-green-300/50 shadow-green-600/15'
-              }`}>
-                <div className="flex gap-2">
-                  <div className={`w-2.5 h-2.5 rounded-full animate-bounce transition-colors duration-300 ${darkMode ? 'bg-green-400' : 'bg-green-600'}`} style={{animationDelay: '0ms'}}></div>
-                  <div className={`w-2.5 h-2.5 rounded-full animate-bounce transition-colors duration-300 ${darkMode ? 'bg-green-400' : 'bg-green-600'}`} style={{animationDelay: '150ms'}}></div>
-                  <div className={`w-2.5 h-2.5 rounded-full animate-bounce transition-colors duration-300 ${darkMode ? 'bg-green-400' : 'bg-green-600'}`} style={{animationDelay: '300ms'}}></div>
+              )}
+            </div>
+          ))}
+          
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-green-700 flex items-center justify-center animate-pulse">
+                  <Bot className="w-6 h-6 text-white" />
+                </div>
+                <div className={`rounded-2xl p-4 ${darkMode ? 'bg-gray-700' : 'bg-white'}`}>
+                  <div className="flex gap-2">
+                    <div className="w-2 h-2 bg-green-600 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-green-600 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                    <div className="w-2 h-2 bg-green-600 rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
-        
-        <div ref={messagesEndRef} />
+          )}
+          
+          <div ref={messagesEndRef} />
         </div>
 
-      {/* Input Area */}
-      <div className={`border-t p-4 md:p-6 transition-colors duration-300 ${
-        darkMode 
-          ? 'bg-gray-800 border-gray-700' 
-          : 'bg-white border-gray-200'
-      }`}>
-        <div className="flex items-end gap-3 max-w-4xl mx-auto">
-          <div className="flex-1">
+        {/* Input */}
+        <div className={`border-t p-4 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+          <div className="flex items-end gap-3">
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyPress={handleKeyPress}
               disabled={isLoading}
               rows={1}
-              placeholder={isListening ? "🎤 Escuchando... Habla ahora" : "Escribe aquí tu consulta"}
-              className={`w-full rounded-2xl px-4 py-3 md:py-4 md:px-6 focus:outline-none focus:ring-2 focus:ring-green-300 transition-all duration-200 text-sm md:text-base disabled:opacity-50 disabled:cursor-not-allowed resize-none ${
-                darkMode 
-                  ? 'bg-gray-700 text-white placeholder-gray-400 focus:bg-gray-600 border border-gray-600 focus:border-green-400' 
-                  : 'bg-white text-gray-900 placeholder-gray-500 focus:bg-white border-2 border-green-200 focus:border-green-400 shadow-sm'
+              placeholder="Escribe aquí..."
+              className={`flex-1 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-300 resize-none ${
+                darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-900'
               }`}
-              style={{
-                minHeight: '48px',
-                maxHeight: '120px',
-                overflowY: 'hidden'
-              }}
-              onInput={(e) => {
-                // Auto-resize textarea
-                e.target.style.height = 'auto';
-                const newHeight = Math.min(e.target.scrollHeight, 120);
-                e.target.style.height = newHeight + 'px';
-                
-                // Solo mostrar scroll si el contenido excede el máximo
-                if (e.target.scrollHeight > 120) {
-                  e.target.style.overflowY = 'auto';
-                } else {
-                  e.target.style.overflowY = 'hidden';
-                }
-              }}
             />
-          </div>
-          
-          {input.trim() && (
-            <button
-              onClick={() => handleSendMessage()}
-              disabled={isLoading}
-              className="bg-gradient-to-r from-green-600 to-green-700 text-white p-2 rounded-full hover:shadow-lg transition-all duration-200 disabled:opacity-50 hover:scale-105 active:scale-95 flex-shrink-0"
+            
+            {input.trim() && (
+              <button
+                onClick={() => handleSend()}
+                disabled={isLoading}
+                className="bg-green-600 text-white p-3 rounded-full hover:bg-green-700 transition-all"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            )}
+            
+            <button 
+              onClick={toggleVoiceRecognition}
+              className={`p-3 rounded-full ${
+                isListening ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-700'
+              }`}
             >
-              <Send className="w-6 h-6" />
+              <Mic className="w-5 h-5" />
             </button>
-          )}
-          
-          <button 
-            onClick={toggleVoiceRecognition}
-            className={`p-2 rounded-full transition-all duration-200 ${
-              isListening
-                ? 'bg-green-700 text-white animate-pulse shadow-lg shadow-green-600/25'
-                : darkMode 
-                  ? 'text-green-400 hover:bg-green-700' 
-                  : 'text-green-700 hover:bg-green-50'
-            }`}
-            title={isListening ? 'Detener grabación' : 'Iniciar grabación de voz'}
-          >
-            <Mic className={`w-6 h-6 ${isListening ? 'animate-pulse' : ''}`} />
-          </button>
+          </div>
         </div>
       </div>
     </div>
-  </div>
   );
 }
 
