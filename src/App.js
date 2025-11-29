@@ -488,10 +488,10 @@ function App() {
   }
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${
+    <div className={`min-h-screen h-screen w-full fixed inset-0 transition-colors duration-300 ${
       darkMode ? 'bg-gradient-to-br from-gray-900 to-gray-800' : 'bg-gradient-to-br from-green-700 to-green-800'
     }`}>
-      <div className={`flex flex-col h-screen max-w-4xl mx-auto relative z-10 ${
+      <div className={`flex flex-col h-full w-full md:h-screen md:max-w-4xl md:mx-auto relative z-10 ${
         darkMode ? 'bg-gray-800' : 'bg-white'
       } md:my-4 md:rounded-2xl md:h-[calc(100vh-2rem)] overflow-hidden shadow-2xl`}>
         
