@@ -94,61 +94,69 @@ function App() {
     return formatted;
   };
 
-  const handleSend = async () => {
-  if (!input.trim() || isLoading) return;
+  // NUEVO: Función para manejar click en botones (envía el value como mensaje)
+  const handleOptionClick = async (optionValue) => {
+    setInput('');  // Limpia input
+    await handleSendMessage(optionValue);  // Envía como mensaje
+  };
 
-  const userMessage = { type: 'user', text: input };
-  setMessages(prev => [...prev, userMessage]);
-  setInput('');
-  setIsLoading(true);
+  const handleSendMessage = async (msg = input) => {
+    if (!msg.trim() || isLoading) return;
 
-  try {
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ 
-        message: input,
-        sessionId: sessionId
-      }),
-    });
+    const userMessage = { type: 'user', text: msg };
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+    setIsLoading(true);
 
-    // ✅ NUEVO: Verifica el status antes de parsear
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Error del servidor:', errorText);
-      throw new Error(`Error ${response.status}: El servidor tuvo un problema`);
+    try {
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          message: msg,
+          sessionId: sessionId
+        }),
+      });
+
+      // ✅ NUEVO: Verifica el status antes de parsear
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Error del servidor:', errorText);
+        throw new Error(`Error ${response.status}: El servidor tuvo un problema`);
+      }
+
+      const data = await response.json();
+
+      if (data.response) {
+        const botMessage = { 
+          type: 'bot', 
+          text: data.response,
+          options: data.options || null  // NUEVO: Guarda opciones para renderizar
+        };
+        setMessages(prev => [...prev, botMessage]);
+      } else {
+        throw new Error(data.error || 'Error en la respuesta');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      const errorMessage = { 
+        type: 'bot', 
+        text: 'Lo siento, hubo un problema al procesar tu consulta.\n\nContacta a:\n📧 centrodeinformatica@uss.edu.pe\n📱 986 724 506' 
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
     }
-
-    const data = await response.json();
-
-    if (data.response) {
-      const botMessage = { type: 'bot', text: data.response };
-      setMessages(prev => [...prev, botMessage]);
-    } else {
-      throw new Error(data.error || 'Error en la respuesta');
-    }
-  } catch (error) {
-    console.error('Error:', error);
-    const errorMessage = { 
-      type: 'bot', 
-      text: 'Lo siento, hubo un problema al procesar tu consulta.\n\nContacta a:\n📧 centrodeinformatica@uss.edu.pe\n📱 986 724 506' 
-    };
-    setMessages(prev => [...prev, errorMessage]);
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      handleSendMessage();
     }
   };
-
-
 
   const startChat = () => {
     setShowSplash(false);
@@ -345,27 +353,48 @@ function App() {
           <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
             {/* Bot messages */}
             {message.type === 'bot' && (
-              <div className="flex items-start gap-3 max-w-[85%] md:max-w-[70%] group">
-                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-green-700 flex items-center justify-center shadow-lg flex-shrink-0 group-hover:shadow-green-600/40 group-hover:scale-105 transition-all duration-300">
-                  <Bot className="w-5 h-5 md:w-6 md:h-6 text-white" />
-                </div>
-                <div className={`rounded-2xl rounded-tl-md p-4 md:p-5 backdrop-blur-sm border-2 group-hover:shadow-xl group-hover:scale-[1.02] transition-all duration-300 ${
-                  darkMode 
-                    ? 'bg-gradient-to-br from-gray-800/95 to-gray-700/90 border-green-400/40 text-gray-100 shadow-lg shadow-green-400/25' 
-                    : 'bg-gradient-to-br from-green-50/90 to-white/95 border-green-400/60 text-gray-800 shadow-lg shadow-green-600/20'
-                } relative overflow-hidden`}>
-                  <div className={`absolute inset-0 bg-gradient-to-r ${
+              <div className="flex flex-col items-start gap-3 max-w-[85%] md:max-w-[70%] group">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-green-700 flex items-center justify-center shadow-lg flex-shrink-0 group-hover:shadow-green-600/40 group-hover:scale-105 transition-all duration-300">
+                    <Bot className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                  </div>
+                  <div className={`rounded-2xl rounded-tl-md p-4 md:p-5 backdrop-blur-sm border-2 group-hover:shadow-xl group-hover:scale-[1.02] transition-all duration-300 ${
                     darkMode 
-                      ? 'from-green-500/5 to-transparent' 
-                      : 'from-green-100/50 to-transparent'
-                  } pointer-events-none`}></div>
-                  <div className="relative z-10">
-                    <div 
-                      className={`text-sm md:text-base leading-relaxed ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}
-                      dangerouslySetInnerHTML={{ __html: formatMessage(message.text) }}
-                    />
+                      ? 'bg-gradient-to-br from-gray-800/95 to-gray-700/90 border-green-400/40 text-gray-100 shadow-lg shadow-green-400/25' 
+                      : 'bg-gradient-to-br from-green-50/90 to-white/95 border-green-400/60 text-gray-800 shadow-lg shadow-green-600/20'
+                  } relative overflow-hidden`}>
+                    <div className={`absolute inset-0 bg-gradient-to-r ${
+                      darkMode 
+                        ? 'from-green-500/5 to-transparent' 
+                        : 'from-green-100/50 to-transparent'
+                    } pointer-events-none`}></div>
+                    <div className="relative z-10">
+                      <div 
+                        className={`text-sm md:text-base leading-relaxed ${darkMode ? 'text-gray-100' : 'text-gray-800'}`}
+                        dangerouslySetInnerHTML={{ __html: formatMessage(message.text) }}
+                      />
+                    </div>
                   </div>
                 </div>
+                
+                {/* NUEVO: Renderiza botones si hay options */}
+                {message.options && message.options.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2 pl-11 md:pl-13">
+                    {message.options.map((option, optIndex) => (
+                      <button
+                        key={optIndex}
+                        onClick={() => handleOptionClick(option.value)}
+                        className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 hover:scale-105 active:scale-95 shadow-md ${
+                          darkMode
+                            ? 'bg-gradient-to-r from-green-600/80 to-green-700/80 text-white hover:from-green-500/90 shadow-green-500/30'
+                            : 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-400 shadow-green-400/40'
+                        }`}
+                      >
+                        {option.text}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
             
@@ -454,7 +483,7 @@ function App() {
           
           {input.trim() && (
             <button
-              onClick={handleSend}
+              onClick={() => handleSendMessage()}
               disabled={isLoading}
               className="bg-gradient-to-r from-green-600 to-green-700 text-white p-2 rounded-full hover:shadow-lg transition-all duration-200 disabled:opacity-50 hover:scale-105 active:scale-95 flex-shrink-0"
             >
