@@ -100,6 +100,58 @@ function App() {
 
     try {
       switch (buttonValue) {
+        case 'es_egresado':
+          setUserData(prev => ({ ...prev, esEgresado: true }));
+          setCurrentStep('verificar_ciclo');
+          botResponse = '¡Perfecto! Para verificar tu elegibilidad, necesito saber:\n\n¿Hasta qué ciclo estudiaste?';
+          nextButtons = [
+            { text: '2023-2 o anterior', value: 'ciclo_elegible' },
+            { text: '2024-1 o posterior', value: 'ciclo_no_elegible' },
+            { text: '❓ Otra consulta', value: 'otra_consulta' }
+          ];
+          break;
+
+        case 'no_egresado':
+          botResponse = 'Entiendo. El Programa de Computación para Egresados está diseñado exclusivamente para egresados de pregrado.\n\n¿Hay algo más en lo que pueda ayudarte?';
+          nextButtons = [
+            { text: '❓ Tengo otra consulta', value: 'otra_consulta' },
+            { text: '📧 Ver contactos', value: 'ver_contactos' }
+          ];
+          break;
+
+        case 'ciclo_elegible':
+          setUserData(prev => ({ ...prev, elegible: true }));
+          setCurrentStep('menu_principal');
+          botResponse = '¡Excelente! Eres elegible para el programa. 🎉\n\n¿Qué te gustaría hacer?';
+          nextButtons = [
+            { text: '📚 Ver cursos disponibles', value: 'ver_cursos' },
+            { text: '📝 Proceso de inscripción', value: 'ver_proceso' },
+            { text: '💳 Métodos de pago', value: 'metodos_pago' },
+            { text: '❓ Otra consulta', value: 'otra_consulta' }
+          ];
+          break;
+
+        case 'ciclo_no_elegible':
+          setUserData(prev => ({ ...prev, elegible: false }));
+          botResponse = 'Entiendo. El Programa de Computación para Egresados está disponible solo para estudiantes hasta el ciclo 2023-2.\n\nPara tu caso, te recomiendo contactar a:\n📧 paccis@uss.edu.pe\n📞 986 724 506';
+          nextButtons = [
+            { text: '❓ Otra consulta', value: 'otra_consulta' },
+            { text: '📧 Ver más contactos', value: 'ver_contactos' }
+          ];
+          break;
+
+        case 'ver_cursos':
+          setCurrentStep('seleccion_curso');
+          botResponse = `📚 **CURSOS DISPONIBLES** (S/ 200 cada uno)\n\nTodos son 100% virtuales, con acceso 24/7 en Aula USS:`;
+          nextButtons = [
+            { text: '📝 Computación 1 - Word (Intermedio-Avanzado)', value: 'curso_1' },
+            { text: '📊 Computación 2 - Excel (Básico-Avanzado)', value: 'curso_2' },
+            { text: '📈 Computación 3 - SPSS y MS Project', value: 'curso_3' },
+            { text: 'ℹ️ Más detalles de todos', value: 'info_cursos' },
+            { text: '❓ Otra consulta', value: 'otra_consulta' }
+          ];
+          break;
+
         case 'elegible_si':
           setUserData(prev => ({ ...prev, elegible: true }));
           setCurrentStep('datos_personales');
@@ -114,6 +166,43 @@ function App() {
           botResponse = 'Entiendo. El Programa de Computación para Egresados está disponible solo para estudiantes hasta el ciclo 2023-2.\n\nPara tu caso, te recomiendo contactar a:\n📧 paccis@uss.edu.pe\n📞 986 724 506';
           nextButtons = [
             { text: 'Tengo otra consulta', value: 'otra_consulta' }
+          ];
+          break;
+
+        case 'otra_consulta':
+          setCurrentStep('consulta_libre');
+          botResponse = 'Por supuesto, estoy aquí para ayudarte. 😊\n\nEscribe tu pregunta en el cuadro de texto y te responderé enseguida:';
+          nextButtons = [];
+          break;
+
+        case 'ver_contactos':
+          botResponse = `📞 **CONTACTOS CENTRO DE INFORMÁTICA USS**
+
+📧 General: centrodeinformatica@uss.edu.pe
+📱 Teléfono: 986 724 506
+
+🔧 Soporte técnico:
+• ciso.dti@uss.edu.pe
+• helpdesk1@uss.edu.pe
+
+📋 Constancias: acempresariales@uss.edu.pe
+📚 Trámites académicos: paccis@uss.edu.pe
+
+¿Hay algo más en lo que pueda ayudarte?`;
+          nextButtons = [
+            { text: '❓ Otra consulta', value: 'otra_consulta' },
+            { text: '🔙 Volver al inicio', value: 'volver_inicio' }
+          ];
+          break;
+
+        case 'volver_inicio':
+          setCurrentStep('inicial');
+          setUserData({});
+          botResponse = '¡Perfecto! ¿En qué puedo ayudarte?';
+          nextButtons = [
+            { text: 'Soy egresado', value: 'es_egresado' },
+            { text: 'No soy egresado', value: 'no_egresado' },
+            { text: '❓ Tengo otra consulta', value: 'otra_consulta' }
           ];
           break;
 
@@ -146,11 +235,13 @@ function App() {
           setUserData(prev => ({ ...prev, cursoSeleccionado: cursos[cursoNumero].nombre }));
           setCurrentStep('confirmacion_curso');
           
-          botResponse = `Has seleccionado: **${cursos[cursoNumero].nombre}**\n${cursos[cursoNumero].contenido}\n\n💰 Costo: S/ 200\n📚 100% Virtual\n⏰ Acceso 24/7\n📝 4 evaluaciones de 30 min c/u\n\n¿Deseas continuar con el proceso de inscripción?`;
+          botResponse = `Has seleccionado: **${cursos[cursoNumero].nombre}**\n${cursos[cursoNumero].contenido}\n\n💰 Costo: S/ 200\n📚 100% Virtual\n⏰ Acceso 24/7\n📝 4 evaluaciones de 30 min c/u\n\n¿Qué deseas hacer?`;
           nextButtons = [
-            { text: '✅ Sí, continuar con inscripción', value: 'ver_proceso' },
-            { text: '🔄 Elegir otro curso', value: 'cambiar_curso' },
-            { text: 'ℹ️ Más información del curso', value: 'info_curso_detalle' }
+            { text: '📝 Ver proceso de inscripción', value: 'ver_proceso' },
+            { text: '💳 Ver métodos de pago', value: 'metodos_pago' },
+            { text: '🔄 Elegir otro curso', value: 'ver_cursos' },
+            { text: 'ℹ️ Más información del curso', value: 'info_curso_detalle' },
+            { text: '❓ Otra consulta', value: 'otra_consulta' }
           ];
           break;
 
@@ -159,59 +250,39 @@ function App() {
           nextButtons = [
             { text: 'Computación 1', value: 'curso_1' },
             { text: 'Computación 2', value: 'curso_2' },
-            { text: 'Computación 3', value: 'curso_3' }
+            { text: 'Computación 3', value: 'curso_3' },
+            { text: '❓ Otra consulta', value: 'otra_consulta' }
+          ];
+          break;
+
+        case 'info_curso_detalle':
+          const cursoActual = userData.cursoSeleccionado || 'el curso seleccionado';
+          botResponse = `ℹ️ **MÁS INFORMACIÓN**\n\n**${cursoActual}**\n\n📖 **Metodología:**\n• 100% autoaprendizaje virtual\n• Material en PDF disponible 24/7\n• Videos y recursos interactivos\n• Sin horarios fijos\n\n📊 **Evaluación:**\n• 4 cuestionarios (30 min c/u)\n• Promedio = (C1 + C2 + C3 + C4) / 4\n• Nota mínima aprobatoria: 11\n\n⏱️ **Duración:**\n• A tu propio ritmo\n• Acceso hasta fin de ciclo\n\n¿Qué más te gustaría saber?`;
+          nextButtons = [
+            { text: '📝 Ver proceso de inscripción', value: 'ver_proceso' },
+            { text: '💳 Métodos de pago', value: 'metodos_pago' },
+            { text: '🔄 Ver otros cursos', value: 'ver_cursos' },
+            { text: '❓ Otra consulta', value: 'otra_consulta' }
           ];
           break;
 
         case 'ver_proceso':
           setCurrentStep('proceso_inscripcion');
-          botResponse = `📋 **PROCESO DE INSCRIPCIÓN**\n\n1️⃣ Ingresa al Campus USS con tus credenciales\n2️⃣ Ve a "Trámites"\n3️⃣ Selecciona "PROGRAMACIÓN DE SERVICIOS"\n4️⃣ Elige "PROGRAMA DE COMPUTACIÓN PARA EGRESADOS USS"\n5️⃣ Haz clic en "Programar"\n6️⃣ Realiza el pago de S/ 200\n7️⃣ Envía el comprobante a:\n📧 centrodeinformatica@uss.edu.pe\n\n¿Necesitas información sobre los métodos de pago?`;
+          botResponse = `📋 **PROCESO DE INSCRIPCIÓN**\n\n1️⃣ Ingresa al Campus USS con tus credenciales\n2️⃣ Ve a "Trámites"\n3️⃣ Selecciona "PROGRAMACIÓN DE SERVICIOS"\n4️⃣ Elige "PROGRAMA DE COMPUTACIÓN PARA EGRESADOS USS"\n5️⃣ Haz clic en "Programar"\n6️⃣ Realiza el pago de S/ 200\n7️⃣ Envía el comprobante a:\n📧 centrodeinformatica@uss.edu.pe\n\n¿Qué más necesitas saber?`;
           nextButtons = [
             { text: '💳 Ver métodos de pago', value: 'metodos_pago' },
-            { text: '✅ Todo claro, gracias', value: 'finalizar' },
-            { text: '❓ Tengo una duda', value: 'escribir_duda' }
+            { text: '📚 Ver cursos', value: 'ver_cursos' },
+            { text: '❓ Otra consulta', value: 'otra_consulta' }
           ];
           break;
 
         case 'metodos_pago':
-          botResponse = `💳 **MÉTODOS DE PAGO**\n\n1. **Campus Virtual - Gestión Financiera**\n   • Tarjeta Visa/Mastercard\n   • Billetera digital / QR\n\n2. **Yape**\n   • Servicios programables\n   • Ingresa tu código de alumno\n\n3. **Aplicativo BCP**\n   • Pagar servicios\n   • "Servicios Programables"\n   • Se refleja en 3-5 horas\n\n4. **Agente/Agencia BCP**\n   • Cuenta: 305-1552328-0-87\n   • Se refleja en hasta 24 horas\n\n¿Te queda alguna duda?`;
+          botResponse = `💳 **MÉTODOS DE PAGO**\n\n1. **Campus Virtual - Gestión Financiera**\n   • Tarjeta Visa/Mastercard\n   • Billetera digital / QR\n\n2. **Yape**\n   • Servicios programables\n   • Ingresa tu código de alumno\n\n3. **Aplicativo BCP**\n   • Pagar servicios\n   • "Servicios Programables"\n   • Se refleja en 3-5 horas\n\n4. **Agente/Agencia BCP**\n   • Cuenta: 305-1552328-0-87\n   • Se refleja en hasta 24 horas\n\n¿Hay algo más que quieras saber?`;
           nextButtons = [
-            { text: '✅ Todo claro', value: 'finalizar' },
-            { text: '🔄 Ver proceso nuevamente', value: 'ver_proceso' },
-            { text: '❓ Hacer una pregunta', value: 'escribir_duda' }
+            { text: '📝 Ver proceso completo', value: 'ver_proceso' },
+            { text: '📚 Ver cursos', value: 'ver_cursos' },
+            { text: '❓ Otra consulta', value: 'otra_consulta' }
           ];
-          break;
-
-        case 'cambiar_curso':
-          setCurrentStep('seleccion_curso');
-          botResponse = '¿En qué curso estás interesado?';
-          nextButtons = [
-            { text: 'Computación 1 - Word', value: 'curso_1' },
-            { text: 'Computación 2 - Excel', value: 'curso_2' },
-            { text: 'Computación 3 - SPSS/Project', value: 'curso_3' }
-          ];
-          break;
-
-        case 'finalizar':
-          botResponse = `¡Perfecto, ${userData.nombre}! 🎉\n\nResumen de tu consulta:\n✅ Curso: ${userData.cursoSeleccionado}\n💰 Costo: S/ 200\n\nRecuerda:\n📧 centrodeinformatica@uss.edu.pe\n📞 986 724 506\n\n¿Hay algo más en lo que pueda ayudarte?`;
-          nextButtons = [
-            { text: 'No, eso es todo. Gracias', value: 'despedida' },
-            { text: 'Tengo otra consulta', value: 'otra_consulta' }
-          ];
-          break;
-
-        case 'despedida':
-          botResponse = '¡Excelente! Gracias por contactarnos. ¡Éxitos en tu curso! 🎓\n\nSi necesitas más ayuda, no dudes en escribirnos.';
-          break;
-
-        case 'otra_consulta':
-          botResponse = '¿En qué más puedo ayudarte? Escribe tu consulta:';
-          setCurrentStep('consulta_libre');
-          break;
-
-        case 'escribir_duda':
-          botResponse = 'Por favor, escribe tu duda en el cuadro de texto y te ayudaré a resolverla:';
-          setCurrentStep('consulta_libre');
           break;
 
         default:
@@ -326,7 +397,14 @@ function App() {
       const data = await response.json();
 
       if (data.response) {
-        const botMessage = { type: 'bot', text: data.response };
+        // Si viene con botones sugeridos del backend, incluirlos
+        const botMessage = { 
+          type: 'bot', 
+          text: data.response,
+          buttons: [
+            { text: '❓ Otra consulta', value: 'otra_consulta' }
+          ]
+        };
         setMessages(prev => [...prev, botMessage]);
       } else {
         throw new Error(data.error || 'Error en la respuesta');
@@ -335,7 +413,10 @@ function App() {
       console.error('Error:', error);
       const errorMessage = { 
         type: 'bot', 
-        text: 'Lo siento, hubo un problema. Contacta a:\n📧 centrodeinformatica@uss.edu.pe\n📱 986 724 506' 
+        text: 'Lo siento, hubo un problema. Contacta a:\n📧 centrodeinformatica@uss.edu.pe\n📱 986 724 506',
+        buttons: [
+          { text: '❓ Otra consulta', value: 'otra_consulta' }
+        ]
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
