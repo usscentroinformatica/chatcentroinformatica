@@ -24,6 +24,17 @@ function App() {
   const [userData, setUserData] = useState({});
   const messagesEndRef = useRef(null);
 
+  // Definición de colores
+  const COLORS = {
+    celeste: '#11acd3',
+    verde: '#63ed12',
+    morado: '#5a2290',
+    verdeHover: '#4ac010',
+    blanco: '#ffffff',
+    grisClaro: '#f0f0f0',
+    grisOscuro: '#333333'
+  };
+
   const API_URL = process.env.NODE_ENV === 'production' ? '/api/chat' : 'http://localhost:5000/api/chat';
 
   const scrollToBottom = () => {
@@ -81,20 +92,18 @@ function App() {
 
   const formatMessage = (text) => {
     let formatted = text.replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold">$1</strong>');
-    formatted = formatted.replace(/^\* (.+)$/gm, '<span class="flex items-start gap-2 my-1"><span class="text-blue-600 dark:text-blue-400 font-bold">•</span><span>$1</span></span>');
-    formatted = formatted.replace(/^(\d+)\. (.+)$/gm, '<span class="flex items-start gap-2 my-1"><span class="text-blue-600 dark:text-blue-400 font-bold">$1.</span><span>$2</span></span>');
+    formatted = formatted.replace(/^\* (.+)$/gm, '<span class="flex items-start gap-2 my-1"><span class="font-bold" style="color: #5a2290">•</span><span>$1</span></span>');
+    formatted = formatted.replace(/^(\d+)\. (.+)$/gm, '<span class="flex items-start gap-2 my-1"><span class="font-bold" style="color: #5a2290">$1.</span><span>$2</span></span>');
     formatted = formatted.replace(/\n\n/g, '<br/><br/>');
     formatted = formatted.replace(/\n/g, '<br/>');
     return formatted;
   };
 
   const handleButtonClick = async (buttonValue, buttonText) => {
-    // Agregar mensaje del usuario con el botón presionado
     const userMessage = { type: 'user', text: buttonText };
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
 
-    // Procesar según el flujo
     let botResponse = '';
     let nextButtons = [];
 
@@ -286,7 +295,6 @@ function App() {
           break;
 
         default:
-          // Para botones personalizados o flujos especiales
           await handleSend(buttonText);
           return;
       }
@@ -315,9 +323,7 @@ function App() {
     setIsLoading(true);
 
     try {
-      // Lógica especial según el paso actual
       if (currentStep === 'esperando_nombre') {
-        // Guardar nombre y pedir correo
         setUserData(prev => ({ ...prev, nombre: textToSend }));
         setCurrentStep('esperando_correo');
         
@@ -332,7 +338,6 @@ function App() {
       }
 
       if (currentStep === 'esperando_correo') {
-        // Validar formato de correo
         const emailRegex = /@uss\.edu\.pe$/i;
         if (!emailRegex.test(textToSend)) {
           const botMessage = { 
@@ -377,7 +382,6 @@ function App() {
         return;
       }
 
-      // Consulta libre - enviar al backend
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
@@ -397,7 +401,6 @@ function App() {
       const data = await response.json();
 
       if (data.response) {
-        // Si viene con botones sugeridos del backend, incluirlos
         const botMessage = { 
           type: 'bot', 
           text: data.response,
@@ -450,34 +453,51 @@ function App() {
 
   if (showSplash) {
     return (
-      <div className="min-h-screen relative overflow-hidden bg-green-700">
-        <div className="absolute inset-0">
-          <div className="absolute top-20 left-10 w-72 h-72 bg-white/10 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-20 right-10 w-96 h-96 bg-green-600/20 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
-        </div>
-        
+      <div className="min-h-screen" style={{ backgroundColor: COLORS.celeste }}>
         <div className="relative z-10 min-h-screen flex items-center justify-center p-8">
           <div className="text-center max-w-md mx-auto">
             <div className="relative mb-12">
               <div className="relative w-32 h-32 mx-auto">
-                <div className="w-full h-full rounded-full bg-white shadow-2xl border-4 border-green-500/50 flex items-center justify-center">
-                  <Bot className="w-16 h-16 text-green-700 animate-bounce" />
+                <div 
+                  className="w-full h-full rounded-full flex items-center justify-center"
+                  style={{ 
+                    backgroundColor: COLORS.blanco,
+                    border: `4px solid ${COLORS.morado}`,
+                    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+                  }}
+                >
+                  <Bot 
+                    className="w-16 h-16 animate-bounce" 
+                    style={{ color: COLORS.morado }}
+                  />
                 </div>
               </div>
             </div>
             
-            <h1 className="text-5xl md:text-6xl font-black text-white mb-3 drop-shadow-2xl">
+            <h1 className="text-5xl md:text-6xl font-black mb-3 drop-shadow-2xl" style={{ color: COLORS.blanco }}>
               Asistente USS
             </h1>
             
-            <p className="text-green-100 text-xl font-light mb-12">
+            <p className="text-xl font-light mb-12" style={{ color: COLORS.blanco }}>
               Tu asistente inteligente del<br />
-              <span className="font-semibold text-white">Centro de Informática USS</span>
+              <span className="font-semibold">Centro de Informática USS</span>
             </p>
             
             <button 
               onClick={startChat}
-              className="group bg-white hover:bg-green-50 text-green-700 font-bold text-lg px-10 py-5 rounded-2xl shadow-2xl hover:scale-110 transition-all"
+              className="group font-bold text-lg px-10 py-5 rounded-2xl shadow-2xl hover:scale-110 transition-all"
+              style={{ 
+                backgroundColor: COLORS.verde,
+                color: COLORS.blanco,
+                border: `2px solid ${COLORS.morado}`,
+                boxShadow: `0 10px 15px -3px ${COLORS.morado}40`
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = COLORS.verdeHover;
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = COLORS.verde;
+              }}
             >
               Comenzar Chat
             </button>
@@ -488,47 +508,56 @@ function App() {
   }
 
   return (
-    <div className={`min-h-screen h-screen w-full fixed inset-0 transition-colors duration-300 ${
-      darkMode ? 'bg-gradient-to-br from-gray-900 to-gray-800' : 'bg-gradient-to-br from-green-700 to-green-800'
-    }`}>
-      <div className={`flex flex-col h-full w-full md:h-screen md:max-w-4xl md:mx-auto relative z-10 ${
-        darkMode ? 'bg-gray-800' : 'bg-white'
-      } md:my-4 md:rounded-2xl md:h-[calc(100vh-2rem)] overflow-hidden shadow-2xl`}>
+    <div className="min-h-screen h-screen w-full fixed inset-0" style={{ backgroundColor: COLORS.celeste }}>
+      <div className="flex flex-col h-full w-full md:h-screen md:max-w-4xl md:mx-auto relative z-10 md:my-4 md:rounded-2xl md:h-[calc(100vh-2rem)] overflow-hidden shadow-2xl"
+        style={{ backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco }}>
         
         {/* Header */}
-        <div className={`p-4 border-b ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+        <div className={`p-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}
+          style={{ backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco }}>
           <div className="flex items-center gap-3">
             <div className="relative">
-              <div className="w-12 h-12 rounded-full bg-green-700 flex items-center justify-center">
-                <Bot className="w-7 h-7 text-white" />
+              <div className="w-12 h-12 rounded-full flex items-center justify-center"
+                style={{ backgroundColor: COLORS.morado }}>
+                <Bot className="w-7 h-7" style={{ color: COLORS.blanco }} />
               </div>
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white"></div>
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2"
+                style={{ backgroundColor: COLORS.verde, borderColor: COLORS.blanco }}></div>
             </div>
             <div className="flex-1">
-              <h1 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              <h1 className="text-lg font-bold" style={{ color: darkMode ? COLORS.blanco : COLORS.grisOscuro }}>
                 Centro de Informática USS
               </h1>
-              <p className="text-sm text-green-500 font-medium">En línea</p>
+              <p className="text-sm font-medium" style={{ color: COLORS.morado }}>En línea</p>
             </div>
             <button onClick={toggleDarkMode} className="p-2">
-              {darkMode ? <Sun className="w-5 h-5 text-yellow-400" /> : <Moon className="w-5 h-5 text-gray-600" />}
+              {darkMode ? (
+                <Sun className="w-5 h-5" style={{ color: COLORS.verde }} />
+              ) : (
+                <Moon className="w-5 h-5" style={{ color: COLORS.celeste }} />
+              )}
             </button>
           </div>
         </div>
 
         {/* Messages */}
-        <div className={`flex-1 overflow-y-auto p-4 space-y-4 ${darkMode ? 'bg-gray-800' : 'bg-gray-50'}`}>
+        <div className={`flex-1 overflow-y-auto p-4 space-y-4 ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}
+          style={{ backgroundColor: darkMode ? '#1a1a1a' : COLORS.grisClaro }}>
           {messages.map((message, index) => (
             <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
               {message.type === 'bot' && (
                 <div className="flex items-start gap-3 max-w-[85%]">
-                  <div className="w-10 h-10 rounded-full bg-green-700 flex items-center justify-center flex-shrink-0">
-                    <Bot className="w-6 h-6 text-white" />
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: COLORS.morado }}>
+                    <Bot className="w-6 h-6" style={{ color: COLORS.blanco }} />
                   </div>
                   <div>
-                    <div className={`rounded-2xl p-4 ${
-                      darkMode ? 'bg-gray-700 text-gray-100' : 'bg-white text-gray-800'
-                    }`}>
+                    <div className="rounded-2xl p-4 shadow-md"
+                      style={{ 
+                        backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco,
+                        color: darkMode ? COLORS.grisClaro : COLORS.grisOscuro,
+                        borderLeft: `4px solid ${COLORS.verde}`
+                      }}>
                       <div 
                         className="text-sm leading-relaxed"
                         dangerouslySetInnerHTML={{ __html: formatMessage(message.text) }}
@@ -542,11 +571,18 @@ function App() {
                           <button
                             key={btnIndex}
                             onClick={() => handleButtonClick(button.value, button.text)}
-                            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105 ${
-                              darkMode 
-                                ? 'bg-green-600 hover:bg-green-500 text-white' 
-                                : 'bg-green-600 hover:bg-green-700 text-white'
-                            } shadow-md hover:shadow-lg`}
+                            className="px-4 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105 shadow-md hover:shadow-lg"
+                            style={{ 
+                              backgroundColor: COLORS.verde,
+                              color: COLORS.blanco,
+                              border: `1px solid ${COLORS.morado}`
+                            }}
+                            onMouseEnter={(e) => {
+                              e.target.style.backgroundColor = COLORS.verdeHover;
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.backgroundColor = COLORS.verde;
+                            }}
                           >
                             {button.text}
                           </button>
@@ -559,10 +595,16 @@ function App() {
               
               {message.type === 'user' && (
                 <div className="flex items-start gap-3 max-w-[85%] flex-row-reverse">
-                  <div className="w-10 h-10 rounded-full bg-green-700 flex items-center justify-center">
-                    <User className="w-6 h-6 text-white" />
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center"
+                    style={{ backgroundColor: COLORS.morado }}>
+                    <User className="w-6 h-6" style={{ color: COLORS.blanco }} />
                   </div>
-                  <div className="bg-green-700 rounded-2xl p-4 text-white text-sm">
+                  <div className="rounded-2xl p-4 text-sm shadow-md"
+                    style={{ 
+                      backgroundColor: COLORS.celeste,
+                      color: COLORS.blanco,
+                      borderRight: `4px solid ${COLORS.verde}`
+                    }}>
                     {message.text}
                   </div>
                 </div>
@@ -573,14 +615,19 @@ function App() {
           {isLoading && (
             <div className="flex justify-start">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-green-700 flex items-center justify-center animate-pulse">
-                  <Bot className="w-6 h-6 text-white" />
+                <div className="w-10 h-10 rounded-full flex items-center justify-center animate-pulse"
+                  style={{ backgroundColor: COLORS.morado }}>
+                  <Bot className="w-6 h-6" style={{ color: COLORS.blanco }} />
                 </div>
-                <div className={`rounded-2xl p-4 ${darkMode ? 'bg-gray-700' : 'bg-white'}`}>
+                <div className="rounded-2xl p-4 shadow-md"
+                  style={{ 
+                    backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco,
+                    borderLeft: `4px solid ${COLORS.verde}`
+                  }}>
                   <div className="flex gap-2">
-                    <div className="w-2 h-2 bg-green-600 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-green-600 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
-                    <div className="w-2 h-2 bg-green-600 rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></div>
+                    <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: COLORS.celeste }}></div>
+                    <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: COLORS.celeste, animationDelay: '0.2s' }}></div>
+                    <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: COLORS.celeste, animationDelay: '0.4s' }}></div>
                   </div>
                 </div>
               </div>
@@ -591,7 +638,11 @@ function App() {
         </div>
 
         {/* Input */}
-        <div className={`border-t p-4 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+        <div className="border-t p-4"
+          style={{ 
+            backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco,
+            borderColor: darkMode ? '#444' : '#e5e7eb'
+          }}>
           <div className="flex items-end gap-3">
             <textarea
               value={input}
@@ -600,16 +651,30 @@ function App() {
               disabled={isLoading}
               rows={1}
               placeholder="Escribe aquí..."
-              className={`flex-1 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-300 resize-none ${
-                darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-900'
-              }`}
+              className="flex-1 rounded-2xl px-4 py-3 focus:outline-none resize-none"
+              style={{ 
+                backgroundColor: darkMode ? '#2a2a2a' : COLORS.grisClaro,
+                color: darkMode ? COLORS.grisClaro : COLORS.grisOscuro,
+                border: `1px solid ${darkMode ? '#444' : '#d1d5db'}`,
+                boxShadow: `inset 0 2px 4px 0 rgba(0,0,0,0.05)`
+              }}
             />
             
             {input.trim() && (
               <button
                 onClick={() => handleSend()}
                 disabled={isLoading}
-                className="bg-green-600 text-white p-3 rounded-full hover:bg-green-700 transition-all"
+                className="p-3 rounded-full hover:scale-105 transition-all shadow-md"
+                style={{ 
+                  backgroundColor: COLORS.verde,
+                  color: COLORS.blanco
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = COLORS.verdeHover;
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = COLORS.verde;
+                }}
               >
                 <Send className="w-5 h-5" />
               </button>
@@ -617,9 +682,12 @@ function App() {
             
             <button 
               onClick={toggleVoiceRecognition}
-              className={`p-3 rounded-full ${
-                isListening ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-700'
-              }`}
+              className="p-3 rounded-full shadow-md transition-all"
+              style={{ 
+                backgroundColor: isListening ? '#ef4444' : (darkMode ? '#2a2a2a' : COLORS.grisClaro),
+                color: isListening ? COLORS.blanco : (darkMode ? COLORS.grisClaro : COLORS.grisOscuro),
+                border: `1px solid ${isListening ? '#dc2626' : (darkMode ? '#444' : '#d1d5db')}`
+              }}
             >
               <Mic className="w-5 h-5" />
             </button>
