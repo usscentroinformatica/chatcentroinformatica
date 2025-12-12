@@ -59,8 +59,8 @@ Para solicitar constancias, certificados o documentos oficiales del programa, co
 📍 **Oficina:** Centro de Informática USS
 
 **Horario de atención:**
-🕐 Lunes a viernes: 8:00 AM - 5:00 PM
-🕐 Sábados: 9:00 AM - 1:00 PM
+🕐 Lunes a viernes: 8:00 AM - 6:00 PM
+🕐 Sábados: 9:00 AM - 12:00 PM
 
 **Requisitos para solicitud:**
 • Nombre completo
