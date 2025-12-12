@@ -463,14 +463,14 @@ function App() {
                 <div 
                   className="w-full h-full rounded-full flex items-center justify-center"
                   style={{ 
-                    backgroundColor: COLORS.verde, // Fondo verde para el ícono
+                    backgroundColor: COLORS.verde,
                     border: `4px solid ${COLORS.morado}`,
                     boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
                   }}
                 >
                   <Bot 
                     className="w-16 h-16 animate-bounce" 
-                    style={{ color: COLORS.morado }} // Ícono morado
+                    style={{ color: COLORS.morado }}
                   />
                 </div>
               </div>
@@ -489,9 +489,9 @@ function App() {
               onClick={startChat}
               className="group font-bold text-lg px-10 py-5 rounded-2xl shadow-2xl hover:scale-110 transition-all"
               style={{ 
-                backgroundColor: COLORS.celeste, // Botón celeste
+                backgroundColor: COLORS.celeste,
                 color: COLORS.blanco,
-                border: `2px solid ${COLORS.verde}`, // Borde verde
+                border: `2px solid ${COLORS.verde}`,
                 boxShadow: `0 10px 15px -3px rgba(99, 237, 18, 0.3)`
               }}
               onMouseEnter={(e) => {
@@ -522,8 +522,8 @@ function App() {
           <div className="flex items-center gap-3">
             <div className="relative">
               <div className="w-12 h-12 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: COLORS.verde }}> {/* Fondo verde */}
-                <Bot className="w-7 h-7" style={{ color: COLORS.morado }} /> {/* Ícono morado */}
+                style={{ backgroundColor: COLORS.verde }}>
+                <Bot className="w-7 h-7" style={{ color: COLORS.morado }} />
               </div>
               <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2"
                 style={{ backgroundColor: COLORS.celeste, borderColor: COLORS.blanco }}></div>
@@ -552,15 +552,15 @@ function App() {
               {message.type === 'bot' && (
                 <div className="flex items-start gap-3 max-w-[85%]">
                   <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: COLORS.verde }}> {/* Fondo verde */}
-                    <Bot className="w-6 h-6" style={{ color: COLORS.morado }} /> {/* Ícono morado */}
+                    style={{ backgroundColor: COLORS.verde }}>
+                    <Bot className="w-6 h-6" style={{ color: COLORS.morado }} />
                   </div>
                   <div>
                     <div className="rounded-2xl p-4 shadow-md"
                       style={{ 
                         backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco,
                         color: darkMode ? COLORS.grisClaro : COLORS.grisOscuro,
-                        borderLeft: `4px solid ${COLORS.celeste}` // Borde celeste
+                        borderLeft: `4px solid ${COLORS.celeste}`
                       }}>
                       <div 
                         className="text-sm leading-relaxed"
@@ -577,9 +577,9 @@ function App() {
                             onClick={() => handleButtonClick(button.value, button.text)}
                             className="px-4 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105 shadow-md hover:shadow-lg"
                             style={{ 
-                              backgroundColor: COLORS.celeste, // Botones celeste
+                              backgroundColor: COLORS.celeste,
                               color: COLORS.blanco,
-                              border: `1px solid ${COLORS.verde}` // Borde verde
+                              border: `1px solid ${COLORS.verde}`
                             }}
                             onMouseEnter={(e) => {
                               e.target.style.backgroundColor = COLORS.celesteHover;
@@ -600,14 +600,14 @@ function App() {
               {message.type === 'user' && (
                 <div className="flex items-start gap-3 max-w-[85%] flex-row-reverse">
                   <div className="w-10 h-10 rounded-full flex items-center justify-center"
-                    style={{ backgroundColor: COLORS.verde }}> {/* Fondo verde */}
-                    <User className="w-6 h-6" style={{ color: COLORS.morado }} /> {/* Ícono morado */}
+                    style={{ backgroundColor: COLORS.verde }}>
+                    <User className="w-6 h-6" style={{ color: COLORS.morado }} />
                   </div>
                   <div className="rounded-2xl p-4 text-sm shadow-md"
                     style={{ 
-                      backgroundColor: COLORS.morado, // Fondo morado para mensajes del usuario
+                      backgroundColor: COLORS.morado,
                       color: COLORS.blanco,
-                      borderRight: `4px solid ${COLORS.celeste}` // Borde celeste
+                      borderRight: `4px solid ${COLORS.celeste}`
                     }}>
                     {message.text}
                   </div>
@@ -620,13 +620,13 @@ function App() {
             <div className="flex justify-start">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-full flex items-center justify-center animate-pulse"
-                  style={{ backgroundColor: COLORS.verde }}> {/* Fondo verde */}
-                  <Bot className="w-6 h-6" style={{ color: COLORS.morado }} /> {/* Ícono morado */}
+                  style={{ backgroundColor: COLORS.verde }}>
+                  <Bot className="w-6 h-6" style={{ color: COLORS.morado }} />
                 </div>
                 <div className="rounded-2xl p-4 shadow-md"
                   style={{ 
                     backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco,
-                    borderLeft: `4px solid ${COLORS.celeste}` // Borde celeste
+                    borderLeft: `4px solid ${COLORS.celeste}`
                   }}>
                   <div className="flex gap-2">
                     <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: COLORS.morado }}></div>
@@ -641,7 +641,7 @@ function App() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input */}
+        {/* Input - CORREGIDO */}
         <div className="border-t p-4"
           style={{ 
             backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco,
@@ -659,8 +659,8 @@ function App() {
               style={{ 
                 backgroundColor: darkMode ? '#2a2a2a' : COLORS.grisClaro,
                 color: darkMode ? COLORS.grisClaro : COLORS.grisOscuro,
-                border: `1px solid ${darkMode ? '#444' : '#d1d5db'}`,
-                boxShadow: `inset 0 2px 4px 0 rgba(0,0,0,0.05)`
+                border: `2px solid ${COLORS.verde}`, // BORDE VERDE MÁS NOTORIO
+                boxShadow: `0 0 0 1px ${COLORS.verde}40, inset 0 2px 4px 0 rgba(0,0,0,0.05)`
               }}
             />
             
@@ -670,7 +670,7 @@ function App() {
                 disabled={isLoading}
                 className="p-3 rounded-full hover:scale-105 transition-all shadow-md"
                 style={{ 
-                  backgroundColor: COLORS.celeste, // Botón celeste
+                  backgroundColor: COLORS.celeste,
                   color: COLORS.blanco
                 }}
                 onMouseEnter={(e) => {
@@ -684,16 +684,16 @@ function App() {
               </button>
             )}
             
+            {/* Icono de voz - CORREGIDO (mismo estilo que el robot) */}
             <button 
               onClick={toggleVoiceRecognition}
-              className="p-3 rounded-full shadow-md transition-all"
+              className="p-3 rounded-full hover:scale-105 transition-all shadow-md"
               style={{ 
-                backgroundColor: isListening ? COLORS.verde : (darkMode ? '#2a2a2a' : COLORS.grisClaro), // Verde cuando está escuchando
-                color: isListening ? COLORS.morado : (darkMode ? COLORS.grisClaro : COLORS.grisOscuro),
-                border: `1px solid ${isListening ? COLORS.verde : (darkMode ? '#444' : '#d1d5db')}`
+                backgroundColor: COLORS.verde, // FONDO VERDE
+                border: isListening ? `2px solid ${COLORS.celeste}` : 'none'
               }}
             >
-              <Mic className="w-5 h-5" />
+              <Mic className="w-5 h-5" style={{ color: COLORS.morado }} /> {/* ÍCONO MORADO */}
             </button>
           </div>
         </div>
