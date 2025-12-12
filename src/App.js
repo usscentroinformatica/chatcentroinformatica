@@ -24,12 +24,14 @@ function App() {
   const [userData, setUserData] = useState({});
   const messagesEndRef = useRef(null);
 
-  // Definición de colores
+  // Definición de colores actualizados
   const COLORS = {
-    celeste: '#11acd3',
-    verde: '#63ed12',
-    morado: '#5a2290',
-    verdeHover: '#4ac010',
+    morado: '#5a2290',      // Fondo principal
+    celeste: '#11acd3',     // Botón Comenzar Chat
+    verde: '#63ed12',       // Fondo del icono
+    moradoIcono: '#5a2290', // Icono en sí (color del ícono)
+    verdeHover: '#4ac010',  // Hover del botón verde
+    celesteHover: '#0e9abf', // Hover del botón celeste
     blanco: '#ffffff',
     grisClaro: '#f0f0f0',
     grisOscuro: '#333333'
@@ -92,8 +94,8 @@ function App() {
 
   const formatMessage = (text) => {
     let formatted = text.replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold">$1</strong>');
-    formatted = formatted.replace(/^\* (.+)$/gm, '<span class="flex items-start gap-2 my-1"><span class="font-bold" style="color: #5a2290">•</span><span>$1</span></span>');
-    formatted = formatted.replace(/^(\d+)\. (.+)$/gm, '<span class="flex items-start gap-2 my-1"><span class="font-bold" style="color: #5a2290">$1.</span><span>$2</span></span>');
+    formatted = formatted.replace(/^\* (.+)$/gm, '<span class="flex items-start gap-2 my-1"><span class="font-bold" style="color: #63ed12">•</span><span>$1</span></span>');
+    formatted = formatted.replace(/^(\d+)\. (.+)$/gm, '<span class="flex items-start gap-2 my-1"><span class="font-bold" style="color: #63ed12">$1.</span><span>$2</span></span>');
     formatted = formatted.replace(/\n\n/g, '<br/><br/>');
     formatted = formatted.replace(/\n/g, '<br/>');
     return formatted;
@@ -453,7 +455,7 @@ function App() {
 
   if (showSplash) {
     return (
-      <div className="min-h-screen" style={{ backgroundColor: COLORS.celeste }}>
+      <div className="min-h-screen" style={{ backgroundColor: COLORS.morado }}>
         <div className="relative z-10 min-h-screen flex items-center justify-center p-8">
           <div className="text-center max-w-md mx-auto">
             <div className="relative mb-12">
@@ -461,14 +463,14 @@ function App() {
                 <div 
                   className="w-full h-full rounded-full flex items-center justify-center"
                   style={{ 
-                    backgroundColor: COLORS.blanco,
+                    backgroundColor: COLORS.verde, // Fondo verde para el ícono
                     border: `4px solid ${COLORS.morado}`,
                     boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
                   }}
                 >
                   <Bot 
                     className="w-16 h-16 animate-bounce" 
-                    style={{ color: COLORS.morado }}
+                    style={{ color: COLORS.morado }} // Ícono morado
                   />
                 </div>
               </div>
@@ -487,16 +489,18 @@ function App() {
               onClick={startChat}
               className="group font-bold text-lg px-10 py-5 rounded-2xl shadow-2xl hover:scale-110 transition-all"
               style={{ 
-                backgroundColor: COLORS.verde,
+                backgroundColor: COLORS.celeste, // Botón celeste
                 color: COLORS.blanco,
-                border: `2px solid ${COLORS.morado}`,
-                boxShadow: `0 10px 15px -3px ${COLORS.morado}40`
+                border: `2px solid ${COLORS.verde}`, // Borde verde
+                boxShadow: `0 10px 15px -3px rgba(99, 237, 18, 0.3)`
               }}
               onMouseEnter={(e) => {
-                e.target.style.backgroundColor = COLORS.verdeHover;
+                e.target.style.backgroundColor = COLORS.celesteHover;
+                e.target.style.boxShadow = `0 10px 15px -3px rgba(99, 237, 18, 0.5)`;
               }}
               onMouseLeave={(e) => {
-                e.target.style.backgroundColor = COLORS.verde;
+                e.target.style.backgroundColor = COLORS.celeste;
+                e.target.style.boxShadow = `0 10px 15px -3px rgba(99, 237, 18, 0.3)`;
               }}
             >
               Comenzar Chat
@@ -508,7 +512,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen h-screen w-full fixed inset-0" style={{ backgroundColor: COLORS.celeste }}>
+    <div className="min-h-screen h-screen w-full fixed inset-0" style={{ backgroundColor: COLORS.morado }}>
       <div className="flex flex-col h-full w-full md:h-screen md:max-w-4xl md:mx-auto relative z-10 md:my-4 md:rounded-2xl md:h-[calc(100vh-2rem)] overflow-hidden shadow-2xl"
         style={{ backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco }}>
         
@@ -518,23 +522,23 @@ function App() {
           <div className="flex items-center gap-3">
             <div className="relative">
               <div className="w-12 h-12 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: COLORS.morado }}>
-                <Bot className="w-7 h-7" style={{ color: COLORS.blanco }} />
+                style={{ backgroundColor: COLORS.verde }}> {/* Fondo verde */}
+                <Bot className="w-7 h-7" style={{ color: COLORS.morado }} /> {/* Ícono morado */}
               </div>
               <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2"
-                style={{ backgroundColor: COLORS.verde, borderColor: COLORS.blanco }}></div>
+                style={{ backgroundColor: COLORS.celeste, borderColor: COLORS.blanco }}></div>
             </div>
             <div className="flex-1">
               <h1 className="text-lg font-bold" style={{ color: darkMode ? COLORS.blanco : COLORS.grisOscuro }}>
                 Centro de Informática USS
               </h1>
-              <p className="text-sm font-medium" style={{ color: COLORS.morado }}>En línea</p>
+              <p className="text-sm font-medium" style={{ color: COLORS.celeste }}>En línea</p>
             </div>
             <button onClick={toggleDarkMode} className="p-2">
               {darkMode ? (
-                <Sun className="w-5 h-5" style={{ color: COLORS.verde }} />
+                <Sun className="w-5 h-5" style={{ color: COLORS.celeste }} />
               ) : (
-                <Moon className="w-5 h-5" style={{ color: COLORS.celeste }} />
+                <Moon className="w-5 h-5" style={{ color: COLORS.morado }} />
               )}
             </button>
           </div>
@@ -548,15 +552,15 @@ function App() {
               {message.type === 'bot' && (
                 <div className="flex items-start gap-3 max-w-[85%]">
                   <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: COLORS.morado }}>
-                    <Bot className="w-6 h-6" style={{ color: COLORS.blanco }} />
+                    style={{ backgroundColor: COLORS.verde }}> {/* Fondo verde */}
+                    <Bot className="w-6 h-6" style={{ color: COLORS.morado }} /> {/* Ícono morado */}
                   </div>
                   <div>
                     <div className="rounded-2xl p-4 shadow-md"
                       style={{ 
                         backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco,
                         color: darkMode ? COLORS.grisClaro : COLORS.grisOscuro,
-                        borderLeft: `4px solid ${COLORS.verde}`
+                        borderLeft: `4px solid ${COLORS.celeste}` // Borde celeste
                       }}>
                       <div 
                         className="text-sm leading-relaxed"
@@ -573,15 +577,15 @@ function App() {
                             onClick={() => handleButtonClick(button.value, button.text)}
                             className="px-4 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105 shadow-md hover:shadow-lg"
                             style={{ 
-                              backgroundColor: COLORS.verde,
+                              backgroundColor: COLORS.celeste, // Botones celeste
                               color: COLORS.blanco,
-                              border: `1px solid ${COLORS.morado}`
+                              border: `1px solid ${COLORS.verde}` // Borde verde
                             }}
                             onMouseEnter={(e) => {
-                              e.target.style.backgroundColor = COLORS.verdeHover;
+                              e.target.style.backgroundColor = COLORS.celesteHover;
                             }}
                             onMouseLeave={(e) => {
-                              e.target.style.backgroundColor = COLORS.verde;
+                              e.target.style.backgroundColor = COLORS.celeste;
                             }}
                           >
                             {button.text}
@@ -596,14 +600,14 @@ function App() {
               {message.type === 'user' && (
                 <div className="flex items-start gap-3 max-w-[85%] flex-row-reverse">
                   <div className="w-10 h-10 rounded-full flex items-center justify-center"
-                    style={{ backgroundColor: COLORS.morado }}>
-                    <User className="w-6 h-6" style={{ color: COLORS.blanco }} />
+                    style={{ backgroundColor: COLORS.verde }}> {/* Fondo verde */}
+                    <User className="w-6 h-6" style={{ color: COLORS.morado }} /> {/* Ícono morado */}
                   </div>
                   <div className="rounded-2xl p-4 text-sm shadow-md"
                     style={{ 
-                      backgroundColor: COLORS.celeste,
+                      backgroundColor: COLORS.morado, // Fondo morado para mensajes del usuario
                       color: COLORS.blanco,
-                      borderRight: `4px solid ${COLORS.verde}`
+                      borderRight: `4px solid ${COLORS.celeste}` // Borde celeste
                     }}>
                     {message.text}
                   </div>
@@ -616,18 +620,18 @@ function App() {
             <div className="flex justify-start">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-full flex items-center justify-center animate-pulse"
-                  style={{ backgroundColor: COLORS.morado }}>
-                  <Bot className="w-6 h-6" style={{ color: COLORS.blanco }} />
+                  style={{ backgroundColor: COLORS.verde }}> {/* Fondo verde */}
+                  <Bot className="w-6 h-6" style={{ color: COLORS.morado }} /> {/* Ícono morado */}
                 </div>
                 <div className="rounded-2xl p-4 shadow-md"
                   style={{ 
                     backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco,
-                    borderLeft: `4px solid ${COLORS.verde}`
+                    borderLeft: `4px solid ${COLORS.celeste}` // Borde celeste
                   }}>
                   <div className="flex gap-2">
-                    <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: COLORS.celeste }}></div>
-                    <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: COLORS.celeste, animationDelay: '0.2s' }}></div>
-                    <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: COLORS.celeste, animationDelay: '0.4s' }}></div>
+                    <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: COLORS.morado }}></div>
+                    <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: COLORS.morado, animationDelay: '0.2s' }}></div>
+                    <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: COLORS.morado, animationDelay: '0.4s' }}></div>
                   </div>
                 </div>
               </div>
@@ -666,14 +670,14 @@ function App() {
                 disabled={isLoading}
                 className="p-3 rounded-full hover:scale-105 transition-all shadow-md"
                 style={{ 
-                  backgroundColor: COLORS.verde,
+                  backgroundColor: COLORS.celeste, // Botón celeste
                   color: COLORS.blanco
                 }}
                 onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = COLORS.verdeHover;
+                  e.target.style.backgroundColor = COLORS.celesteHover;
                 }}
                 onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = COLORS.verde;
+                  e.target.style.backgroundColor = COLORS.celeste;
                 }}
               >
                 <Send className="w-5 h-5" />
@@ -684,9 +688,9 @@ function App() {
               onClick={toggleVoiceRecognition}
               className="p-3 rounded-full shadow-md transition-all"
               style={{ 
-                backgroundColor: isListening ? '#ef4444' : (darkMode ? '#2a2a2a' : COLORS.grisClaro),
-                color: isListening ? COLORS.blanco : (darkMode ? COLORS.grisClaro : COLORS.grisOscuro),
-                border: `1px solid ${isListening ? '#dc2626' : (darkMode ? '#444' : '#d1d5db')}`
+                backgroundColor: isListening ? COLORS.verde : (darkMode ? '#2a2a2a' : COLORS.grisClaro), // Verde cuando está escuchando
+                color: isListening ? COLORS.morado : (darkMode ? COLORS.grisClaro : COLORS.grisOscuro),
+                border: `1px solid ${isListening ? COLORS.verde : (darkMode ? '#444' : '#d1d5db')}`
               }}
             >
               <Mic className="w-5 h-5" />
