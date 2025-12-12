@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Moon, Sun, Mic, FileText, X } from 'lucide-react';
+import { Send, Bot, User, Moon, Sun, Mic, FileText, X, Menu, XCircle } from 'lucide-react';
 
 function App() {
   const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
   const [showSplash, setShowSplash] = useState(true);
-  const [showPdfGuide, setShowPdfGuide] = useState(true); // Visible por defecto
+  const [showPdfGuide, setShowPdfGuide] = useState(true);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [messages, setMessages] = useState([
     { 
       type: 'bot', 
@@ -18,7 +19,7 @@ function App() {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [darkMode, setDarkMode] = useState(false); // Tema claro por defecto
+  const [darkMode, setDarkMode] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState(null);
   const [currentStep, setCurrentStep] = useState('elegibilidad');
@@ -662,13 +663,17 @@ Contacta a paccis@uss.edu.pe para orientación
     setShowPdfGuide(!showPdfGuide);
   };
 
+  const toggleMobileMenu = () => {
+    setShowMobileMenu(!showMobileMenu);
+  };
+
   if (showSplash) {
     return (
       <div className="min-h-screen relative overflow-hidden" style={{ backgroundColor: COLORS.morado }}>
-        <div className="relative z-10 min-h-screen flex items-center justify-center p-8">
-          <div className="text-center max-w-md mx-auto">
-            <div className="relative mb-12">
-              <div className="relative w-32 h-32 mx-auto">
+        <div className="relative z-10 min-h-screen flex items-center justify-center p-4 sm:p-8">
+          <div className="text-center max-w-md mx-auto px-4">
+            <div className="relative mb-8 sm:mb-12">
+              <div className="relative w-24 h-24 sm:w-32 sm:h-32 mx-auto">
                 <div 
                   className="w-full h-full rounded-full flex items-center justify-center"
                   style={{ 
@@ -678,25 +683,25 @@ Contacta a paccis@uss.edu.pe para orientación
                   }}
                 >
                   <Bot 
-                    className="w-16 h-16 animate-bounce" 
+                    className="w-12 h-12 sm:w-16 sm:h-16 animate-bounce" 
                     style={{ color: COLORS.morado }}
                   />
                 </div>
               </div>
             </div>
             
-            <h1 className="text-5xl md:text-6xl font-black mb-3 drop-shadow-2xl" style={{ color: COLORS.blanco }}>
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-black mb-3 drop-shadow-2xl" style={{ color: COLORS.blanco }}>
               Asistente USS
             </h1>
             
-            <p className="text-xl font-light mb-12" style={{ color: COLORS.blanco }}>
+            <p className="text-lg sm:text-xl font-light mb-8 sm:mb-12" style={{ color: COLORS.blanco }}>
               Tu asistente inteligente del<br />
               <span className="font-semibold">Centro de Informática USS</span>
             </p>
             
             <button 
               onClick={startChat}
-              className="group font-bold text-lg px-10 py-5 rounded-2xl shadow-2xl hover:scale-110 transition-all"
+              className="group font-bold text-base sm:text-lg px-8 sm:px-10 py-4 sm:py-5 rounded-2xl shadow-2xl hover:scale-105 sm:hover:scale-110 transition-all"
               style={{ 
                 backgroundColor: COLORS.celeste,
                 color: COLORS.blanco,
@@ -723,61 +728,75 @@ Contacta a paccis@uss.edu.pe para orientación
   return (
     <div className="min-h-screen h-screen w-full fixed inset-0" style={{ backgroundColor: COLORS.morado }}>
       <div className="flex h-full w-full md:max-w-6xl md:mx-auto relative z-10 md:my-4 md:rounded-2xl md:h-[calc(100vh-2rem)] overflow-hidden shadow-2xl">
-        {/* Panel lateral del PDF - Visible por defecto en desktop */}
+        {/* Panel lateral del PDF - RESPONSIVE */}
         {showPdfGuide && (
-          <div className="hidden md:flex flex-col w-96 bg-white shadow-xl z-20">
+          <div className={`fixed md:relative inset-0 md:inset-auto z-30 flex flex-col w-full md:w-96 bg-white shadow-xl transition-transform duration-300 ${
+            showPdfGuide ? 'translate-x-0' : '-translate-x-full'
+          }`}>
             <div className="p-4 border-b flex justify-between items-center" style={{ backgroundColor: COLORS.morado }}>
               <h2 className="text-lg font-bold text-white">📚 Guía de Uso</h2>
-              <button onClick={togglePdfGuide} className="p-1 hover:bg-white/20 rounded">
-                <X className="w-5 h-5 text-white" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={togglePdfGuide}
+                  className="p-1 hover:bg-white/20 rounded md:hidden"
+                >
+                  <X className="w-5 h-5 text-white" />
+                </button>
+                <button 
+                  onClick={togglePdfGuide}
+                  className="p-1 hover:bg-white/20 rounded hidden md:block"
+                  title="Ocultar guía"
+                >
+                  <X className="w-5 h-5 text-white" />
+                </button>
+              </div>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-6">
-              <div className="mb-6">
-                <h3 className="text-xl font-bold mb-2" style={{ color: COLORS.morado }}>Cómo usar este Chatbot</h3>
-                <p className="text-gray-600 mb-4">Sigue esta guía para obtener la mejor experiencia:</p>
+            <div className="flex-1 overflow-y-auto p-4 md:p-6">
+              <div className="mb-4 md:mb-6">
+                <h3 className="text-lg md:text-xl font-bold mb-2" style={{ color: COLORS.morado }}>Cómo usar este Chatbot</h3>
+                <p className="text-sm md:text-base text-gray-600 mb-4">Sigue esta guía para obtener la mejor experiencia:</p>
               </div>
               
-              <div className="space-y-4">
-                <div className="p-4 rounded-lg border" style={{ borderColor: COLORS.verde }}>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.celeste }}>
-                      <span className="text-white font-bold">1</span>
+              <div className="space-y-3 md:space-y-4">
+                <div className="p-3 md:p-4 rounded-lg border" style={{ borderColor: COLORS.verde }}>
+                  <div className="flex items-center gap-2 md:gap-3 mb-2">
+                    <div className="w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.celeste }}>
+                      <span className="text-xs md:text-base text-white font-bold">1</span>
                     </div>
-                    <h4 className="font-bold" style={{ color: COLORS.morado }}>Consulta directa</h4>
+                    <h4 className="font-bold text-sm md:text-base" style={{ color: COLORS.morado }}>Consulta directa</h4>
                   </div>
-                  <p className="text-sm text-gray-600">Puedes escribir directamente lo que necesitas: "constancias", "certificados", "pagos", "cursos", etc.</p>
+                  <p className="text-xs md:text-sm text-gray-600">Puedes escribir directamente lo que necesitas: "constancias", "certificados", "pagos", "cursos", etc.</p>
                 </div>
                 
-                <div className="p-4 rounded-lg border" style={{ borderColor: COLORS.celeste }}>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.verde }}>
-                      <span className="text-white font-bold">2</span>
+                <div className="p-3 md:p-4 rounded-lg border" style={{ borderColor: COLORS.celeste }}>
+                  <div className="flex items-center gap-2 md:gap-3 mb-2">
+                    <div className="w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.verde }}>
+                      <span className="text-xs md:text-base text-white font-bold">2</span>
                     </div>
-                    <h4 className="font-bold" style={{ color: COLORS.morado }}>Botones de acción</h4>
+                    <h4 className="font-bold text-sm md:text-base" style={{ color: COLORS.morado }}>Botones de acción</h4>
                   </div>
-                  <p className="text-sm text-gray-600">Usa los botones para navegar rápidamente por las opciones principales del programa.</p>
+                  <p className="text-xs md:text-sm text-gray-600">Usa los botones para navegar rápidamente por las opciones principales del programa.</p>
                 </div>
                 
-                <div className="p-4 rounded-lg border" style={{ borderColor: COLORS.morado }}>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.morado }}>
-                      <span className="text-white font-bold">3</span>
+                <div className="p-3 md:p-4 rounded-lg border" style={{ borderColor: COLORS.morado }}>
+                  <div className="flex items-center gap-2 md:gap-3 mb-2">
+                    <div className="w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.morado }}>
+                      <span className="text-xs md:text-base text-white font-bold">3</span>
                     </div>
-                    <h4 className="font-bold" style={{ color: COLORS.morado }}>Voz y texto</h4>
+                    <h4 className="font-bold text-sm md:text-base" style={{ color: COLORS.morado }}>Voz y texto</h4>
                   </div>
-                  <p className="text-sm text-gray-600">Puedes usar el micrófono para dictar tu consulta o escribir manualmente.</p>
+                  <p className="text-xs md:text-sm text-gray-600">Puedes usar el micrófono para dictar tu consulta o escribir manualmente.</p>
                 </div>
                 
-                <div className="p-4 rounded-lg border" style={{ borderColor: COLORS.verde }}>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.celeste }}>
-                      <span className="text-white font-bold">4</span>
+                <div className="p-3 md:p-4 rounded-lg border" style={{ borderColor: COLORS.verde }}>
+                  <div className="flex items-center gap-2 md:gap-3 mb-2">
+                    <div className="w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.celeste }}>
+                      <span className="text-xs md:text-base text-white font-bold">4</span>
                     </div>
-                    <h4 className="font-bold" style={{ color: COLORS.morado }}>Temas comunes</h4>
+                    <h4 className="font-bold text-sm md:text-base" style={{ color: COLORS.morado }}>Temas comunes</h4>
                   </div>
-                  <ul className="text-sm text-gray-600 space-y-1">
+                  <ul className="text-xs md:text-sm text-gray-600 space-y-1">
                     <li>• <strong>Constancias:</strong> acempresariales@uss.edu.pe</li>
                     <li>• <strong>Cursos:</strong> Word, Excel, SPSS/Project (S/200 c/u)</li>
                     <li>• <strong>Pagos:</strong> Yape, BCP, Tarjeta</li>
@@ -786,9 +805,9 @@ Contacta a paccis@uss.edu.pe para orientación
                 </div>
               </div>
               
-              <div className="mt-8 p-4 rounded-lg" style={{ backgroundColor: COLORS.celeste + '20' }}>
-                <h4 className="font-bold mb-2" style={{ color: COLORS.morado }}>📋 Información importante</h4>
-                <p className="text-sm text-gray-700">
+              <div className="mt-6 md:mt-8 p-3 md:p-4 rounded-lg" style={{ backgroundColor: COLORS.celeste + '20' }}>
+                <h4 className="font-bold text-sm md:text-base mb-2" style={{ color: COLORS.morado }}>📋 Información importante</h4>
+                <p className="text-xs md:text-sm text-gray-700">
                   Este chatbot está diseñado específicamente para el <strong>Programa de Computación para Egresados USS</strong>. 
                   Para otros trámites académicos, contacta directamente con las áreas correspondientes.
                 </p>
@@ -801,39 +820,76 @@ Contacta a paccis@uss.edu.pe para orientación
         <div className="flex-1 flex flex-col relative"
           style={{ backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco }}>
           
-          {/* Header con botón para mostrar/ocultar guía */}
-          <div className={`p-4 border-b flex justify-between items-center ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}
+          {/* Header con botón para mostrar/ocultar guía - RESPONSIVE */}
+          <div className={`p-3 sm:p-4 border-b flex justify-between items-center ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}
             style={{ backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco }}>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <button
+                onClick={toggleMobileMenu}
+                className="md:hidden p-2"
+              >
+                <Menu className="w-5 h-5" style={{ color: darkMode ? COLORS.grisClaro : COLORS.grisOscuro }} />
+              </button>
               <div className="relative">
-                <div className="w-12 h-12 rounded-full flex items-center justify-center"
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center"
                   style={{ backgroundColor: COLORS.verde }}>
-                  <Bot className="w-7 h-7" style={{ color: COLORS.morado }} />
+                  <Bot className="w-5 h-5 sm:w-7 sm:h-7" style={{ color: COLORS.morado }} />
                 </div>
-                <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2"
+                <div className="absolute -bottom-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 rounded-full border-2"
                   style={{ backgroundColor: COLORS.celeste, borderColor: COLORS.blanco }}></div>
               </div>
               <div className="flex-1">
-                <h1 className="text-lg font-bold" style={{ color: darkMode ? COLORS.blanco : COLORS.grisOscuro }}>
+                <h1 className="text-base sm:text-lg font-bold" style={{ color: darkMode ? COLORS.blanco : COLORS.grisOscuro }}>
                   Centro de Informática USS
                 </h1>
-                <p className="text-sm font-medium" style={{ color: COLORS.celeste }}>En línea</p>
+                <p className="text-xs sm:text-sm font-medium" style={{ color: COLORS.celeste }}>En línea</p>
               </div>
             </div>
             
             <div className="flex items-center gap-2">
-              {/* Botón para mostrar/ocultar guía - Color cambia según tema */}
+              {/* Botón para mostrar guía en móvil */}
               <button 
                 onClick={togglePdfGuide}
-                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                title={showPdfGuide ? "Ocultar guía" : "Mostrar guía"}
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors md:hidden"
+                title="Mostrar guía"
               >
                 <FileText className="w-5 h-5" style={{ 
                   color: darkMode ? COLORS.celeste : COLORS.morado 
                 }} />
               </button>
               
-              <button onClick={toggleDarkMode} className="p-2">
+              {/* Botón de guía con texto en desktop */}
+              <button 
+                onClick={togglePdfGuide}
+                className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                title={showPdfGuide ? "Ocultar guía" : "Mostrar guía"}
+              >
+                <FileText className="w-4 h-4" style={{ 
+                  color: darkMode ? COLORS.celeste : COLORS.morado 
+                }} />
+                <span className="text-sm font-medium" style={{ color: darkMode ? COLORS.grisClaro : COLORS.grisOscuro }}>
+                  {showPdfGuide ? "Ocultar guía" : "Mostrar guía"}
+                </span>
+              </button>
+              
+              {/* Botón de tema con texto en desktop */}
+              <button 
+                onClick={toggleDarkMode}
+                className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                title={darkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+              >
+                {darkMode ? (
+                  <Sun className="w-4 h-4" style={{ color: COLORS.celeste }} />
+                ) : (
+                  <Moon className="w-4 h-4" style={{ color: COLORS.morado }} />
+                )}
+                <span className="text-sm font-medium" style={{ color: darkMode ? COLORS.grisClaro : COLORS.grisOscuro }}>
+                  {darkMode ? "Modo claro" : "Modo oscuro"}
+                </span>
+              </button>
+              
+              {/* Solo iconos en móvil */}
+              <button onClick={toggleDarkMode} className="md:hidden p-2">
                 {darkMode ? (
                   <Sun className="w-5 h-5" style={{ color: COLORS.celeste }} />
                 ) : (
@@ -844,37 +900,37 @@ Contacta a paccis@uss.edu.pe para orientación
           </div>
 
           {/* Messages */}
-          <div className={`flex-1 overflow-y-auto p-4 space-y-4 ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}
+          <div className={`flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}
             style={{ backgroundColor: darkMode ? '#1a1a1a' : COLORS.grisClaro }}>
             {messages.map((message, index) => (
               <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
                 {message.type === 'bot' && (
-                  <div className="flex items-start gap-3 max-w-[85%]">
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                  <div className="flex items-start gap-2 sm:gap-3 max-w-[90%] sm:max-w-[85%]">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0"
                       style={{ backgroundColor: COLORS.verde }}>
-                      <Bot className="w-6 h-6" style={{ color: COLORS.morado }} />
+                      <Bot className="w-4 h-4 sm:w-6 sm:h-6" style={{ color: COLORS.morado }} />
                     </div>
                     <div>
-                      <div className="rounded-2xl p-4 shadow-md"
+                      <div className="rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-md"
                         style={{ 
                           backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco,
                           color: darkMode ? COLORS.grisClaro : COLORS.grisOscuro,
-                          borderLeft: `4px solid ${COLORS.celeste}`
+                          borderLeft: `3px solid ${COLORS.celeste}`
                         }}>
                         <div 
-                          className="text-sm leading-relaxed"
+                          className="text-xs sm:text-sm leading-relaxed"
                           dangerouslySetInnerHTML={{ __html: formatMessage(message.text) }}
                         />
                       </div>
                       
                       {/* Botones de respuesta rápida */}
                       {message.buttons && message.buttons.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-3">
+                        <div className="flex flex-wrap gap-1 sm:gap-2 mt-2 sm:mt-3">
                           {message.buttons.map((button, btnIndex) => (
                             <button
                               key={btnIndex}
                               onClick={() => handleButtonClick(button.value, button.text)}
-                              className="px-4 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105 shadow-md hover:shadow-lg"
+                              className="px-2 py-1 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium transition-all hover:scale-105 shadow-md hover:shadow-lg"
                               style={{ 
                                 backgroundColor: COLORS.celeste,
                                 color: COLORS.blanco,
@@ -897,16 +953,16 @@ Contacta a paccis@uss.edu.pe para orientación
                 )}
                 
                 {message.type === 'user' && (
-                  <div className="flex items-start gap-3 max-w-[85%] flex-row-reverse">
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center"
+                  <div className="flex items-start gap-2 sm:gap-3 max-w-[90%] sm:max-w-[85%] flex-row-reverse">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center"
                       style={{ backgroundColor: COLORS.verde }}>
-                      <User className="w-6 h-6" style={{ color: COLORS.morado }} />
+                      <User className="w-4 h-4 sm:w-6 sm:h-6" style={{ color: COLORS.morado }} />
                     </div>
-                    <div className="rounded-2xl p-4 text-sm shadow-md"
+                    <div className="rounded-xl sm:rounded-2xl p-3 sm:p-4 text-xs sm:text-sm shadow-md"
                       style={{ 
                         backgroundColor: COLORS.morado,
                         color: COLORS.blanco,
-                        borderRight: `4px solid ${COLORS.celeste}`
+                        borderRight: `3px solid ${COLORS.celeste}`
                       }}>
                       {message.text}
                     </div>
@@ -917,20 +973,20 @@ Contacta a paccis@uss.edu.pe para orientación
             
             {isLoading && (
               <div className="flex justify-start">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center animate-pulse"
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center animate-pulse"
                     style={{ backgroundColor: COLORS.verde }}>
-                    <Bot className="w-6 h-6" style={{ color: COLORS.morado }} />
+                    <Bot className="w-4 h-4 sm:w-6 sm:h-6" style={{ color: COLORS.morado }} />
                   </div>
-                  <div className="rounded-2xl p-4 shadow-md"
+                  <div className="rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-md"
                     style={{ 
                       backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco,
-                      borderLeft: `4px solid ${COLORS.celeste}`
+                      borderLeft: `3px solid ${COLORS.celeste}`
                     }}>
-                    <div className="flex gap-2">
-                      <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: COLORS.morado }}></div>
-                      <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: COLORS.morado, animationDelay: '0.2s' }}></div>
-                      <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: COLORS.morado, animationDelay: '0.4s' }}></div>
+                    <div className="flex gap-1 sm:gap-2">
+                      <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full animate-bounce" style={{ backgroundColor: COLORS.morado }}></div>
+                      <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full animate-bounce" style={{ backgroundColor: COLORS.morado, animationDelay: '0.2s' }}></div>
+                      <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full animate-bounce" style={{ backgroundColor: COLORS.morado, animationDelay: '0.4s' }}></div>
                     </div>
                   </div>
                 </div>
@@ -940,13 +996,13 @@ Contacta a paccis@uss.edu.pe para orientación
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input - SIN SUGERENCIAS RÁPIDAS */}
-          <div className="border-t p-4"
+          {/* Input - RESPONSIVE */}
+          <div className="border-t p-3 sm:p-4"
             style={{ 
               backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco,
               borderColor: darkMode ? '#444' : '#e5e7eb'
             }}>
-            <div className="flex items-end gap-3">
+            <div className="flex items-end gap-2 sm:gap-3">
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -954,7 +1010,7 @@ Contacta a paccis@uss.edu.pe para orientación
                 disabled={isLoading}
                 rows={1}
                 placeholder="Escribe aquí tu consulta..."
-                className="flex-1 rounded-2xl px-4 py-3 focus:outline-none resize-none"
+                className="flex-1 rounded-xl sm:rounded-2xl px-3 py-2 sm:px-4 sm:py-3 focus:outline-none resize-none text-sm sm:text-base"
                 style={{ 
                   backgroundColor: darkMode ? '#2a2a2a' : COLORS.grisClaro,
                   color: darkMode ? COLORS.grisClaro : COLORS.grisOscuro,
@@ -967,7 +1023,7 @@ Contacta a paccis@uss.edu.pe para orientación
                 <button
                   onClick={() => handleSend()}
                   disabled={isLoading}
-                  className="p-3 rounded-full hover:scale-105 transition-all shadow-md"
+                  className="p-2 sm:p-3 rounded-full hover:scale-105 transition-all shadow-md flex-shrink-0"
                   style={{ 
                     backgroundColor: COLORS.celeste,
                     color: COLORS.blanco
@@ -979,19 +1035,19 @@ Contacta a paccis@uss.edu.pe para orientación
                     e.target.style.backgroundColor = COLORS.celeste;
                   }}
                 >
-                  <Send className="w-5 h-5" />
+                  <Send className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
               )}
               
               <button 
                 onClick={toggleVoiceRecognition}
-                className="p-3 rounded-full hover:scale-105 transition-all shadow-md"
+                className="p-2 sm:p-3 rounded-full hover:scale-105 transition-all shadow-md flex-shrink-0"
                 style={{ 
                   backgroundColor: COLORS.verde,
                   border: isListening ? `2px solid ${COLORS.celeste}` : 'none'
                 }}
               >
-                <Mic className="w-5 h-5" style={{ color: COLORS.morado }} />
+                <Mic className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: COLORS.morado }} />
               </button>
             </div>
           </div>
