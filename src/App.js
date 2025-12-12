@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Moon, Sun, Mic, CheckCircle, XCircle, Volume2, VolumeX } from 'lucide-react';
+import { Send, Bot, User, Moon, Sun, Mic, Volume2 } from 'lucide-react';
 
 function App() {
   const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
   const [showSplash, setShowSplash] = useState(true);
-  const [showIntro, setShowIntro] = useState(true); // Nueva variable para controlar la intro
-  const [isPlaying, setIsPlaying] = useState(true); // Para controlar la voz
+  const [showIntro, setShowIntro] = useState(true);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [messages, setMessages] = useState([
     { 
       type: 'bot', 
@@ -26,14 +26,14 @@ function App() {
   const [userData, setUserData] = useState({});
   const messagesEndRef = useRef(null);
 
-  // Definición de colores actualizados
+  // Definición de colores
   const COLORS = {
-    morado: '#5a2290',      // Fondo principal
-    celeste: '#11acd3',     // Botón Comenzar Chat
-    verde: '#63ed12',       // Fondo del icono
-    moradoIcono: '#5a2290', // Icono en sí (color del ícono)
-    verdeHover: '#4ac010',  // Hover del botón verde
-    celesteHover: '#0e9abf', // Hover del botón celeste
+    morado: '#5a2290',
+    celeste: '#11acd3',
+    verde: '#63ed12',
+    moradoIcono: '#5a2290',
+    verdeHover: '#4ac010',
+    celesteHover: '#0e9abf',
     blanco: '#ffffff',
     grisClaro: '#f0f0f0',
     grisOscuro: '#333333'
@@ -41,36 +41,88 @@ function App() {
 
   const API_URL = process.env.NODE_ENV === 'production' ? '/api/chat' : 'http://localhost:5000/api/chat';
 
+  // Efecto para la intro con voz
   useEffect(() => {
-    // Si estamos en la intro, reproducir la voz después de un breve delay
     if (showIntro && showSplash) {
-      const timer = setTimeout(() => {
-        // Crear síntesis de voz
-        const synth = window.speechSynthesis;
-        const utterance = new SpeechSynthesisUtterance();
-        
-        // Configurar la voz
-        utterance.text = "Bienvenidos al chatbot del Centro de Informática. Aquí podrás despejar tus dudas sobre los cursos de computación que tengas pendiente.";
-        utterance.lang = 'es-ES';
-        utterance.rate = 1.0; // Velocidad normal
-        utterance.pitch = 1.0; // Tono normal
-        utterance.volume = 1.0; // Volumen máximo
-        
-        // Cuando termine de hablar, iniciar animación de alejamiento
-        utterance.onend = () => {
-          setIsPlaying(false);
-          // Esperar 1 segundo antes de iniciar la animación de alejamiento
+      const speakWelcome = () => {
+        // Crear síntesis de voz con fallback por si el navegador no soporta
+        if ('speechSynthesis' in window) {
+          const synth = window.speechSynthesis;
+          
+          // Detener cualquier voz previa
+          synth.cancel();
+          
+          // Crear el texto de bienvenida
+          const utterance = new SpeechSynthesisUtterance();
+          utterance.text = "Bienvenidos al chatbot del Centro de Informática. Aquí podrás despejar tus dudas sobre los cursos de computación que tengas pendiente.";
+          utterance.lang = 'es-ES';
+          utterance.rate = 1.0;
+          utterance.pitch = 1.0;
+          utterance.volume = 1.0;
+          
+          setIsSpeaking(true);
+          
+          utterance.onstart = () => {
+            console.log('La voz comenzó a reproducirse');
+          };
+          
+          utterance.onend = () => {
+            console.log('La voz terminó');
+            setIsSpeaking(false);
+            // Iniciar animación de salida después de que termine la voz
+            setTimeout(() => {
+              setShowIntro(false);
+            }, 300); // Pequeña pausa antes de la animación
+          };
+          
+          utterance.onerror = (event) => {
+            console.error('Error en síntesis de voz:', event);
+            setIsSpeaking(false);
+            // Si falla la voz, continuar con la animación
+            setTimeout(() => {
+              setShowIntro(false);
+            }, 1500);
+          };
+          
+          // Intentar reproducir
+          try {
+            synth.speak(utterance);
+          } catch (error) {
+            console.error('Error al reproducir voz:', error);
+            setIsSpeaking(false);
+            setTimeout(() => {
+              setShowIntro(false);
+            }, 1500);
+          }
+        } else {
+          // Si el navegador no soporta síntesis de voz, continuar sin ella
+          console.log('Síntesis de voz no soportada');
           setTimeout(() => {
             setShowIntro(false);
-          }, 1000);
-        };
-        
-        // Reproducir la voz
-        synth.speak(utterance);
-        setIsPlaying(true);
-      }, 1000); // Esperar 1 segundo antes de empezar a hablar
+          }, 2000);
+        }
+      };
+
+      // Esperar un momento antes de empezar
+      const timer = setTimeout(speakWelcome, 800);
       
-      return () => clearTimeout(timer);
+      // Timeout de seguridad por si la voz no se reproduce
+      const safetyTimer = setTimeout(() => {
+        if (showIntro) {
+          console.log('Timeout de seguridad activado');
+          setIsSpeaking(false);
+          setShowIntro(false);
+        }
+      }, 5000); // Máximo 5 segundos
+
+      return () => {
+        clearTimeout(timer);
+        clearTimeout(safetyTimer);
+        // Detener la voz si el componente se desmonta
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+        }
+      };
     }
   }, [showIntro, showSplash]);
 
@@ -489,125 +541,79 @@ function App() {
   };
 
   const skipIntro = () => {
-    // Detener la voz si está reproduciéndose
-    window.speechSynthesis.cancel();
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
     setShowIntro(false);
   };
 
   if (showSplash) {
     return (
       <div className="min-h-screen relative overflow-hidden" style={{ backgroundColor: COLORS.morado }}>
-        {/* Animación de partículas en el fondo */}
-        <div className="absolute inset-0 overflow-hidden">
-          {[...Array(20)].map((_, i) => (
-            <div 
-              key={i}
-              className="absolute rounded-full animate-pulse"
-              style={{
-                width: `${Math.random() * 100 + 50}px`,
-                height: `${Math.random() * 100 + 50}px`,
-                top: `${Math.random() * 100}%`,
-                left: `${Math.random() * 100}%`,
-                backgroundColor: COLORS.celeste,
-                opacity: Math.random() * 0.1 + 0.05,
-                animationDelay: `${Math.random() * 2}s`,
-                animationDuration: `${Math.random() * 3 + 2}s`
-              }}
-            />
-          ))}
-        </div>
-
-        <div className="relative z-10 min-h-screen flex items-center justify-center p-8">
-          {/* ANIMACIÓN DE INTRODUCCIÓN */}
-          {showIntro ? (
-            <div className="text-center max-w-4xl mx-auto">
-              {/* Icono grande con animación */}
-              <div className={`relative ${isPlaying ? 'animate-pulse' : ''}`}>
-                <div className="relative w-64 h-64 mx-auto mb-12">
-                  <div 
-                    className={`w-full h-full rounded-full flex items-center justify-center transition-all duration-1000 ease-in-out ${
-                      !isPlaying ? 'scale-75' : ''
-                    }`}
-                    style={{ 
-                      backgroundColor: COLORS.verde,
-                      border: `8px solid ${COLORS.celeste}`,
-                      boxShadow: `
-                        0 0 60px ${COLORS.celeste}80,
-                        0 0 120px ${COLORS.celeste}40,
-                        0 0 180px ${COLORS.celeste}20,
-                        inset 0 0 60px ${COLORS.blanco}20
-                      `
-                    }}
-                  >
-                    <Bot 
-                      className={`transition-all duration-1000 ease-in-out ${
-                        !isPlaying ? 'w-24 h-24' : 'w-32 h-32'
-                      }`}
-                      style={{ 
-                        color: COLORS.morado,
-                        filter: 'drop-shadow(0 0 10px rgba(255, 255, 255, 0.5))'
-                      }}
-                    />
-                  </div>
-                  
-                  {/* Anillos concéntricos animados */}
-                  {isPlaying && (
-                    <>
-                      <div 
-                        className="absolute inset-0 rounded-full border-4 border-celeste animate-ping"
-                        style={{ 
-                          borderColor: COLORS.celeste,
-                          animationDuration: '2s'
-                        }}
-                      />
-                      <div 
-                        className="absolute inset-[-20px] rounded-full border-2 border-verde animate-ping"
-                        style={{ 
-                          borderColor: COLORS.verde,
-                          animationDuration: '3s',
-                          animationDelay: '0.5s'
-                        }}
-                      />
-                    </>
-                  )}
-                </div>
-                
-                {/* Indicador de sonido */}
-                <div className="absolute top-4 right-4 animate-bounce">
-                  <Volume2 className="w-8 h-8" style={{ color: COLORS.blanco }} />
-                </div>
-              </div>
-              
-              {/* Texto de bienvenida que aparece suavemente */}
-              <div className={`mb-12 transition-all duration-1000 delay-500 ${isPlaying ? 'opacity-100' : 'opacity-0'}`}>
-                <h1 className="text-6xl md:text-7xl font-black mb-6" style={{ 
-                  color: COLORS.blanco,
-                  textShadow: `0 5px 15px rgba(0, 0, 0, 0.3)`
-                }}>
-                  Bienvenidos
-                </h1>
-                <p className="text-2xl md:text-3xl font-light max-w-2xl mx-auto" style={{ 
-                  color: COLORS.blanco,
-                  lineHeight: '1.6'
-                }}>
-                  al chatbot del Centro de Informática
-                </p>
-              </div>
-              
-              {/* Botón para saltar intro */}
-              <button 
-                onClick={skipIntro}
-                className="mt-8 px-6 py-3 rounded-full text-sm font-medium opacity-70 hover:opacity-100 transition-opacity"
+        {/* ANIMACIÓN DE INTRODUCCIÓN - SIMPLIFICADA */}
+        {showIntro ? (
+          <div className="relative z-10 min-h-screen flex flex-col items-center justify-center p-8">
+            {/* Icono grande con animación */}
+            <div className={`relative mb-8 transition-all duration-1000 ease-out ${
+              isSpeaking ? 'scale-100' : 'scale-50'
+            }`}>
+              <div 
+                className="w-64 h-64 rounded-full flex items-center justify-center"
                 style={{ 
-                  backgroundColor: COLORS.celeste,
-                  color: COLORS.blanco
+                  backgroundColor: COLORS.verde,
+                  border: `8px solid ${COLORS.celeste}`,
+                  boxShadow: `
+                    0 0 40px ${COLORS.celeste}80,
+                    inset 0 0 40px ${COLORS.blanco}20
+                  `
                 }}
               >
-                Saltar introducción
-              </button>
+                <Bot 
+                  className={`w-32 h-32 transition-all duration-700 ${
+                    isSpeaking ? 'animate-pulse' : ''
+                  }`}
+                  style={{ 
+                    color: COLORS.morado,
+                    filter: 'drop-shadow(0 0 8px rgba(255, 255, 255, 0.5))'
+                  }}
+                />
+                
+                {/* Indicador de sonido animado */}
+                {isSpeaking && (
+                  <div className="absolute -top-4 -right-4">
+                    <Volume2 className="w-8 h-8 animate-bounce" style={{ color: COLORS.blanco }} />
+                  </div>
+                )}
+              </div>
+              
+              {/* Anillo de sonido */}
+              {isSpeaking && (
+                <div 
+                  className="absolute inset-[-20px] rounded-full border-4 animate-ping"
+                  style={{ 
+                    borderColor: COLORS.celeste,
+                    animationDuration: '1.5s'
+                  }}
+                />
+              )}
             </div>
-          ) : (
-            /* PANTALLA NORMAL DESPUÉS DE LA INTRO */
+            
+            {/* Botón para saltar intro */}
+            <button 
+              onClick={skipIntro}
+              className="mt-8 px-6 py-3 rounded-full text-sm font-medium transition-all hover:scale-105"
+              style={{ 
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                color: COLORS.blanco,
+                backdropFilter: 'blur(10px)'
+              }}
+            >
+              Saltar intro
+            </button>
+          </div>
+        ) : (
+          /* PANTALLA NORMAL DESPUÉS DE LA INTRO */
+          <div className="relative z-10 min-h-screen flex items-center justify-center p-8">
             <div className="text-center max-w-md mx-auto animate-fadeIn">
               <div className="relative mb-12">
                 <div className="relative w-32 h-32 mx-auto">
@@ -620,30 +626,34 @@ function App() {
                     }}
                   >
                     <Bot 
-                      className="w-16 h-16 animate-bounce" 
+                      className="w-16 h-16" 
                       style={{ color: COLORS.morado }}
                     />
                   </div>
                 </div>
               </div>
               
-              <h1 className="text-5xl md:text-6xl font-black mb-3 drop-shadow-2xl" style={{ color: COLORS.blanco }}>
+              <h1 className="text-5xl md:text-6xl font-black mb-3 animate-fadeInUp" style={{ color: COLORS.blanco }}>
                 Asistente USS
               </h1>
               
-              <p className="text-xl font-light mb-12" style={{ color: COLORS.blanco }}>
+              <p className="text-xl font-light mb-12 animate-fadeInUp" style={{ 
+                color: COLORS.blanco,
+                animationDelay: '0.2s'
+              }}>
                 Tu asistente inteligente del<br />
                 <span className="font-semibold">Centro de Informática USS</span>
               </p>
               
               <button 
                 onClick={startChat}
-                className="group font-bold text-lg px-10 py-5 rounded-2xl shadow-2xl hover:scale-110 transition-all"
+                className="group font-bold text-lg px-10 py-5 rounded-2xl shadow-2xl hover:scale-110 transition-all animate-fadeInUp"
                 style={{ 
                   backgroundColor: COLORS.celeste,
                   color: COLORS.blanco,
                   border: `2px solid ${COLORS.verde}`,
-                  boxShadow: `0 10px 15px -3px rgba(99, 237, 18, 0.3)`
+                  boxShadow: `0 10px 15px -3px rgba(99, 237, 18, 0.3)`,
+                  animationDelay: '0.4s'
                 }}
                 onMouseEnter={(e) => {
                   e.target.style.backgroundColor = COLORS.celesteHover;
@@ -657,13 +667,12 @@ function App() {
                 Comenzar Chat
               </button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     );
   }
 
-  // Resto del código del chat (sin cambios)
   return (
     <div className="min-h-screen h-screen w-full fixed inset-0" style={{ backgroundColor: COLORS.morado }}>
       <div className="flex flex-col h-full w-full md:h-screen md:max-w-4xl md:mx-auto relative z-10 md:my-4 md:rounded-2xl md:h-[calc(100vh-2rem)] overflow-hidden shadow-2xl"
