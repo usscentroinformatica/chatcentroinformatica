@@ -1,11 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Moon, Sun, Mic, Volume2 } from 'lucide-react';
+import { Send, Bot, User, Moon, Sun, Mic, FileText, X, ChevronRight, ChevronLeft } from 'lucide-react';
 
 function App() {
   const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
   const [showSplash, setShowSplash] = useState(true);
-  const [showIntro, setShowIntro] = useState(true);
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [showPdfGuide, setShowPdfGuide] = useState(false);
   const [messages, setMessages] = useState([
     { 
       type: 'bot', 
@@ -41,90 +40,192 @@ function App() {
 
   const API_URL = process.env.NODE_ENV === 'production' ? '/api/chat' : 'http://localhost:5000/api/chat';
 
-  // Efecto para la intro con voz
-  useEffect(() => {
-    if (showIntro && showSplash) {
-      const speakWelcome = () => {
-        // Crear síntesis de voz con fallback por si el navegador no soporta
-        if ('speechSynthesis' in window) {
-          const synth = window.speechSynthesis;
-          
-          // Detener cualquier voz previa
-          synth.cancel();
-          
-          // Crear el texto de bienvenida
-          const utterance = new SpeechSynthesisUtterance();
-          utterance.text = "Bienvenidos al chatbot del Centro de Informática. Aquí podrás despejar tus dudas sobre los cursos de computación que tengas pendiente.";
-          utterance.lang = 'es-ES';
-          utterance.rate = 1.0;
-          utterance.pitch = 1.0;
-          utterance.volume = 1.0;
-          
-          setIsSpeaking(true);
-          
-          utterance.onstart = () => {
-            console.log('La voz comenzó a reproducirse');
-          };
-          
-          utterance.onend = () => {
-            console.log('La voz terminó');
-            setIsSpeaking(false);
-            // Iniciar animación de salida después de que termine la voz
-            setTimeout(() => {
-              setShowIntro(false);
-            }, 300); // Pequeña pausa antes de la animación
-          };
-          
-          utterance.onerror = (event) => {
-            console.error('Error en síntesis de voz:', event);
-            setIsSpeaking(false);
-            // Si falla la voz, continuar con la animación
-            setTimeout(() => {
-              setShowIntro(false);
-            }, 1500);
-          };
-          
-          // Intentar reproducir
-          try {
-            synth.speak(utterance);
-          } catch (error) {
-            console.error('Error al reproducir voz:', error);
-            setIsSpeaking(false);
-            setTimeout(() => {
-              setShowIntro(false);
-            }, 1500);
-          }
-        } else {
-          // Si el navegador no soporta síntesis de voz, continuar sin ella
-          console.log('Síntesis de voz no soportada');
-          setTimeout(() => {
-            setShowIntro(false);
-          }, 2000);
-        }
-      };
+  // Función para detectar consultas específicas y responder directamente
+  const detectAndRespondToKeywords = (message) => {
+    const lowerMsg = message.toLowerCase().trim();
+    
+    // Detectar palabras clave relacionadas con constancias/certificados
+    if (lowerMsg.includes('constancia') || lowerMsg.includes('certificado') || 
+        lowerMsg.includes('certificacion') || lowerMsg.includes('documento') ||
+        lowerMsg.includes('papel') || lowerMsg.includes('comprobante')) {
+      return {
+        type: 'bot',
+        text: `📋 **INFORMACIÓN SOBRE CONSTANCIAS Y CERTIFICADOS**
 
-      // Esperar un momento antes de empezar
-      const timer = setTimeout(speakWelcome, 800);
-      
-      // Timeout de seguridad por si la voz no se reproduce
-      const safetyTimer = setTimeout(() => {
-        if (showIntro) {
-          console.log('Timeout de seguridad activado');
-          setIsSpeaking(false);
-          setShowIntro(false);
-        }
-      }, 5000); // Máximo 5 segundos
+Para solicitar constancias, certificados o documentos oficiales del programa, contacta directamente a:
 
-      return () => {
-        clearTimeout(timer);
-        clearTimeout(safetyTimer);
-        // Detener la voz si el componente se desmonta
-        if ('speechSynthesis' in window) {
-          window.speechSynthesis.cancel();
-        }
+📧 **Correo oficial:** acempresariales@uss.edu.pe
+📞 **Teléfono:** 986 724 506
+📍 **Oficina:** Centro de Informática USS
+
+**Horario de atención:**
+🕐 Lunes a viernes: 8:00 AM - 5:00 PM
+🕐 Sábados: 9:00 AM - 1:00 PM
+
+**Requisitos para solicitud:**
+• Nombre completo
+• Código de alumno
+• Correo institucional (@uss.edu.pe)
+• Especificar tipo de documento requerido
+
+¿Necesitas ayuda con algo más?`,
+        buttons: [
+          { text: '📚 Información de cursos', value: 'ver_cursos' },
+          { text: '📝 Proceso de inscripción', value: 'ver_proceso' },
+          { text: '❓ Otra consulta', value: 'otra_consulta' }
+        ]
       };
     }
-  }, [showIntro, showSplash]);
+    
+    // Detectar contacto/soporte técnico
+    if (lowerMsg.includes('contacto') || lowerMsg.includes('soporte') || 
+        lowerMsg.includes('telefono') || lowerMsg.includes('correo') ||
+        lowerMsg.includes('llamar') || lowerMsg.includes('escribir')) {
+      return {
+        type: 'bot',
+        text: `📞 **CONTACTOS CENTRO DE INFORMÁTICA USS**
+
+📧 **General:** centrodeinformatica@uss.edu.pe
+📱 **Teléfono:** 986 724 506
+
+🔧 **Soporte técnico:**
+• ciso.dti@uss.edu.pe
+• helpdesk1@uss.edu.pe
+
+📋 **Constancias y documentos:** acempresariales@uss.edu.pe
+📚 **Trámites académicos:** paccis@uss.edu.pe
+
+**Horario de atención:**
+🕐 Lunes a viernes: 8:00 AM - 5:00 PM
+🕐 Sábados: 9:00 AM - 1:00 PM
+
+¿En qué más puedo ayudarte?`,
+        buttons: [
+          { text: '📚 Cursos disponibles', value: 'ver_cursos' },
+          { text: '💳 Métodos de pago', value: 'metodos_pago' },
+          { text: '❓ Otra consulta', value: 'otra_consulta' }
+        ]
+      };
+    }
+    
+    // Detectar pagos/métodos de pago
+    if (lowerMsg.includes('pago') || lowerMsg.includes('pagar') || 
+        lowerMsg.includes('yape') || lowerMsg.includes('bcp') ||
+        lowerMsg.includes('tarjeta') || lowerMsg.includes('dinero')) {
+      return {
+        type: 'bot',
+        text: `💳 **MÉTODOS DE PAGO**
+
+1. **Campus Virtual - Gestión Financiera**
+   • Tarjeta Visa/Mastercard
+   • Billetera digital / QR
+
+2. **Yape**
+   • Servicios programables
+   • Ingresa tu código de alumno
+
+3. **Aplicativo BCP**
+   • Pagar servicios
+   • "Servicios Programables"
+   • Se refleja en 3-5 horas
+
+4. **Agente/Agencia BCP**
+   • Cuenta: 305-1552328-0-87
+   • Se refleja en hasta 24 horas
+
+💰 **Todos los cursos cuestan S/ 200 cada uno**
+
+¿Necesitas ayuda con el proceso de inscripción?`,
+        buttons: [
+          { text: '📝 Proceso de inscripción', value: 'ver_proceso' },
+          { text: '📚 Ver cursos', value: 'ver_cursos' },
+          { text: '❓ Otra consulta', value: 'otra_consulta' }
+        ]
+      };
+    }
+    
+    // Detectar cursos/computación
+    if (lowerMsg.includes('curso') || lowerMsg.includes('computacion') || 
+        lowerMsg.includes('word') || lowerMsg.includes('excel') ||
+        lowerMsg.includes('spss') || lowerMsg.includes('project')) {
+      return {
+        type: 'bot',
+        text: `📚 **CURSOS DISPONIBLES** (S/ 200 cada uno)
+
+📝 **Computación 1:** Microsoft Word (Intermedio-Avanzado)
+📊 **Computación 2:** Microsoft Excel (Básico-Avanzado)
+📈 **Computación 3:** IBM SPSS y MS Project
+
+**Características:**
+• 100% virtual (Aula USS)
+• Acceso 24/7
+• Autoaprendizaje
+• 4 evaluaciones por curso
+
+¿Te interesa algún curso en particular?`,
+        buttons: [
+          { text: '📝 Computación 1 - Word', value: 'curso_1' },
+          { text: '📊 Computación 2 - Excel', value: 'curso_2' },
+          { text: '📈 Computación 3 - SPSS/Project', value: 'curso_3' },
+          { text: '❓ Otra consulta', value: 'otra_consulta' }
+        ]
+      };
+    }
+    
+    // Detectar proceso/inscripción
+    if (lowerMsg.includes('proceso') || lowerMsg.includes('inscri') || 
+        lowerMsg.includes('registr') || lowerMsg.includes('matricul') ||
+        lowerMsg.includes('como me inscribo') || lowerMsg.includes('pasos')) {
+      return {
+        type: 'bot',
+        text: `📋 **PROCESO DE INSCRIPCIÓN**
+
+1️⃣ Ingresa al Campus USS con tus credenciales
+2️⃣ Ve a "Trámites" > "PROGRAMACIÓN DE SERVICIOS"
+3️⃣ Selecciona "PROGRAMA DE COMPUTACIÓN PARA EGRESADOS USS"
+4️⃣ Haz clic en "Programar"
+5️⃣ Realiza el pago de S/ 200
+6️⃣ Envía el comprobante a: centrodeinformatica@uss.edu.pe
+
+**Tiempo de procesamiento:** 24-48 horas hábiles
+
+¿Necesitas información sobre métodos de pago?`,
+        buttons: [
+          { text: '💳 Métodos de pago', value: 'metodos_pago' },
+          { text: '📚 Ver cursos', value: 'ver_cursos' },
+          { text: '❓ Otra consulta', value: 'otra_consulta' }
+        ]
+      };
+    }
+    
+    // Detectar elegibilidad/requisitos
+    if (lowerMsg.includes('elegible') || lowerMsg.includes('requisito') || 
+        lowerMsg.includes('puedo llevar') || lowerMsg.includes('puedo tomar') ||
+        lowerMsg.includes('soy de ciclo') || lowerMsg.includes('2023') || lowerMsg.includes('2024')) {
+      return {
+        type: 'bot',
+        text: `🎓 **REQUISITOS DE ELEGIBILIDAD**
+
+El programa está dirigido a:
+• Egresados de pregrado USS
+• Hasta el ciclo **2023-2**
+• Con pendiente de acreditación en cursos de computación
+
+**Si eres de ciclo 2024-1 o posterior:**
+Contacta a paccis@uss.edu.pe para orientación
+
+**¿Eres egresado hasta 2023-2?`,
+        buttons: [
+          { text: '✅ Sí, soy elegible', value: 'elegible_si' },
+          { text: '❌ No soy elegible', value: 'elegible_no' },
+          { text: '❓ Otra consulta', value: 'otra_consulta' }
+        ]
+      };
+    }
+    
+    // Si no detecta ninguna palabra clave específica, devolver null para usar la IA
+    return null;
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -394,7 +495,10 @@ function App() {
       console.error('Error procesando botón:', error);
       const errorMessage = { 
         type: 'bot', 
-        text: 'Lo siento, hubo un error. Por favor intenta nuevamente.'
+        text: 'Lo siento, hubo un error. Por favor intenta nuevamente.',
+        buttons: [
+          { text: '❓ Otra consulta', value: 'otra_consulta' }
+        ]
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
@@ -412,6 +516,17 @@ function App() {
     setIsLoading(true);
 
     try {
+      // PRIMERO: Verificar si es una consulta con palabras clave específicas
+      const keywordResponse = detectAndRespondToKeywords(textToSend);
+      
+      if (keywordResponse) {
+        // Si detectamos palabras clave, responder directamente
+        setMessages(prev => [...prev, keywordResponse]);
+        setIsLoading(false);
+        return;
+      }
+
+      // SEGUNDO: Lógica especial según el paso actual
       if (currentStep === 'esperando_nombre') {
         setUserData(prev => ({ ...prev, nombre: textToSend }));
         setCurrentStep('esperando_correo');
@@ -471,6 +586,7 @@ function App() {
         return;
       }
 
+      // TERCERO: Si no es ninguna de las anteriores, usar la IA
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
@@ -540,322 +656,388 @@ function App() {
     }
   };
 
-  const skipIntro = () => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-    setShowIntro(false);
+  const togglePdfGuide = () => {
+    setShowPdfGuide(!showPdfGuide);
   };
 
   if (showSplash) {
     return (
       <div className="min-h-screen relative overflow-hidden" style={{ backgroundColor: COLORS.morado }}>
-        {/* ANIMACIÓN DE INTRODUCCIÓN - SIMPLIFICADA */}
-        {showIntro ? (
-          <div className="relative z-10 min-h-screen flex flex-col items-center justify-center p-8">
-            {/* Icono grande con animación */}
-            <div className={`relative mb-8 transition-all duration-1000 ease-out ${
-              isSpeaking ? 'scale-100' : 'scale-50'
-            }`}>
-              <div 
-                className="w-64 h-64 rounded-full flex items-center justify-center"
-                style={{ 
-                  backgroundColor: COLORS.verde,
-                  border: `8px solid ${COLORS.celeste}`,
-                  boxShadow: `
-                    0 0 40px ${COLORS.celeste}80,
-                    inset 0 0 40px ${COLORS.blanco}20
-                  `
-                }}
-              >
-                <Bot 
-                  className={`w-32 h-32 transition-all duration-700 ${
-                    isSpeaking ? 'animate-pulse' : ''
-                  }`}
-                  style={{ 
-                    color: COLORS.morado,
-                    filter: 'drop-shadow(0 0 8px rgba(255, 255, 255, 0.5))'
-                  }}
-                />
-                
-                {/* Indicador de sonido animado */}
-                {isSpeaking && (
-                  <div className="absolute -top-4 -right-4">
-                    <Volume2 className="w-8 h-8 animate-bounce" style={{ color: COLORS.blanco }} />
-                  </div>
-                )}
-              </div>
-              
-              {/* Anillo de sonido */}
-              {isSpeaking && (
+        <div className="relative z-10 min-h-screen flex items-center justify-center p-8">
+          <div className="text-center max-w-md mx-auto">
+            <div className="relative mb-12">
+              <div className="relative w-32 h-32 mx-auto">
                 <div 
-                  className="absolute inset-[-20px] rounded-full border-4 animate-ping"
+                  className="w-full h-full rounded-full flex items-center justify-center"
                   style={{ 
-                    borderColor: COLORS.celeste,
-                    animationDuration: '1.5s'
+                    backgroundColor: COLORS.verde,
+                    border: `4px solid ${COLORS.morado}`,
+                    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
                   }}
-                />
-              )}
-            </div>
-            
-            {/* Botón para saltar intro */}
-            <button 
-              onClick={skipIntro}
-              className="mt-8 px-6 py-3 rounded-full text-sm font-medium transition-all hover:scale-105"
-              style={{ 
-                backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                color: COLORS.blanco,
-                backdropFilter: 'blur(10px)'
-              }}
-            >
-              Saltar intro
-            </button>
-          </div>
-        ) : (
-          /* PANTALLA NORMAL DESPUÉS DE LA INTRO */
-          <div className="relative z-10 min-h-screen flex items-center justify-center p-8">
-            <div className="text-center max-w-md mx-auto animate-fadeIn">
-              <div className="relative mb-12">
-                <div className="relative w-32 h-32 mx-auto">
-                  <div 
-                    className="w-full h-full rounded-full flex items-center justify-center"
-                    style={{ 
-                      backgroundColor: COLORS.verde,
-                      border: `4px solid ${COLORS.morado}`,
-                      boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-                    }}
-                  >
-                    <Bot 
-                      className="w-16 h-16" 
-                      style={{ color: COLORS.morado }}
-                    />
-                  </div>
+                >
+                  <Bot 
+                    className="w-16 h-16 animate-bounce" 
+                    style={{ color: COLORS.morado }}
+                  />
                 </div>
               </div>
-              
-              <h1 className="text-5xl md:text-6xl font-black mb-3 animate-fadeInUp" style={{ color: COLORS.blanco }}>
-                Asistente USS
-              </h1>
-              
-              <p className="text-xl font-light mb-12 animate-fadeInUp" style={{ 
-                color: COLORS.blanco,
-                animationDelay: '0.2s'
-              }}>
-                Tu asistente inteligente del<br />
-                <span className="font-semibold">Centro de Informática USS</span>
-              </p>
-              
-              <button 
-                onClick={startChat}
-                className="group font-bold text-lg px-10 py-5 rounded-2xl shadow-2xl hover:scale-110 transition-all animate-fadeInUp"
-                style={{ 
-                  backgroundColor: COLORS.celeste,
-                  color: COLORS.blanco,
-                  border: `2px solid ${COLORS.verde}`,
-                  boxShadow: `0 10px 15px -3px rgba(99, 237, 18, 0.3)`,
-                  animationDelay: '0.4s'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = COLORS.celesteHover;
-                  e.target.style.boxShadow = `0 10px 15px -3px rgba(99, 237, 18, 0.5)`;
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = COLORS.celeste;
-                  e.target.style.boxShadow = `0 10px 15px -3px rgba(99, 237, 18, 0.3)`;
-                }}
-              >
-                Comenzar Chat
-              </button>
             </div>
+            
+            <h1 className="text-5xl md:text-6xl font-black mb-3 drop-shadow-2xl" style={{ color: COLORS.blanco }}>
+              Asistente USS
+            </h1>
+            
+            <p className="text-xl font-light mb-12" style={{ color: COLORS.blanco }}>
+              Tu asistente inteligente del<br />
+              <span className="font-semibold">Centro de Informática USS</span>
+            </p>
+            
+            <button 
+              onClick={startChat}
+              className="group font-bold text-lg px-10 py-5 rounded-2xl shadow-2xl hover:scale-110 transition-all"
+              style={{ 
+                backgroundColor: COLORS.celeste,
+                color: COLORS.blanco,
+                border: `2px solid ${COLORS.verde}`,
+                boxShadow: `0 10px 15px -3px rgba(99, 237, 18, 0.3)`
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = COLORS.celesteHover;
+                e.target.style.boxShadow = `0 10px 15px -3px rgba(99, 237, 18, 0.5)`;
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = COLORS.celeste;
+                e.target.style.boxShadow = `0 10px 15px -3px rgba(99, 237, 18, 0.3)`;
+              }}
+            >
+              Comenzar Chat
+            </button>
           </div>
-        )}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen h-screen w-full fixed inset-0" style={{ backgroundColor: COLORS.morado }}>
-      <div className="flex flex-col h-full w-full md:h-screen md:max-w-4xl md:mx-auto relative z-10 md:my-4 md:rounded-2xl md:h-[calc(100vh-2rem)] overflow-hidden shadow-2xl"
-        style={{ backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco }}>
-        
-        {/* Header */}
-        <div className={`p-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}
-          style={{ backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco }}>
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: COLORS.verde }}>
-                <Bot className="w-7 h-7" style={{ color: COLORS.morado }} />
+      <div className="flex h-full w-full md:max-w-6xl md:mx-auto relative z-10 md:my-4 md:rounded-2xl md:h-[calc(100vh-2rem)] overflow-hidden shadow-2xl">
+        {/* Panel lateral del PDF - Oculto por defecto, se muestra con botón */}
+        {showPdfGuide && (
+          <div className="hidden md:flex flex-col w-96 bg-white shadow-xl z-20">
+            <div className="p-4 border-b flex justify-between items-center" style={{ backgroundColor: COLORS.morado }}>
+              <h2 className="text-lg font-bold text-white">📚 Guía de Uso</h2>
+              <button onClick={togglePdfGuide} className="p-1 hover:bg-white/20 rounded">
+                <X className="w-5 h-5 text-white" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="mb-6">
+                <h3 className="text-xl font-bold mb-2" style={{ color: COLORS.morado }}>Cómo usar este Chatbot</h3>
+                <p className="text-gray-600 mb-4">Sigue esta guía para obtener la mejor experiencia:</p>
               </div>
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2"
-                style={{ backgroundColor: COLORS.celeste, borderColor: COLORS.blanco }}></div>
+              
+              <div className="space-y-4">
+                <div className="p-4 rounded-lg border" style={{ borderColor: COLORS.verde }}>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.celeste }}>
+                      <span className="text-white font-bold">1</span>
+                    </div>
+                    <h4 className="font-bold" style={{ color: COLORS.morado }}>Consulta directa</h4>
+                  </div>
+                  <p className="text-sm text-gray-600">Puedes escribir directamente lo que necesitas: "constancias", "certificados", "pagos", "cursos", etc.</p>
+                </div>
+                
+                <div className="p-4 rounded-lg border" style={{ borderColor: COLORS.celeste }}>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.verde }}>
+                      <span className="text-white font-bold">2</span>
+                    </div>
+                    <h4 className="font-bold" style={{ color: COLORS.morado }}>Botones de acción</h4>
+                  </div>
+                  <p className="text-sm text-gray-600">Usa los botones para navegar rápidamente por las opciones principales del programa.</p>
+                </div>
+                
+                <div className="p-4 rounded-lg border" style={{ borderColor: COLORS.morado }}>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.morado }}>
+                      <span className="text-white font-bold">3</span>
+                    </div>
+                    <h4 className="font-bold" style={{ color: COLORS.morado }}>Voz y texto</h4>
+                  </div>
+                  <p className="text-sm text-gray-600">Puedes usar el micrófono para dictar tu consulta o escribir manualmente.</p>
+                </div>
+                
+                <div className="p-4 rounded-lg border" style={{ borderColor: COLORS.verde }}>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ backgroundColor: COLORS.celeste }}>
+                      <span className="text-white font-bold">4</span>
+                    </div>
+                    <h4 className="font-bold" style={{ color: COLORS.morado }}>Temas comunes</h4>
+                  </div>
+                  <ul className="text-sm text-gray-600 space-y-1">
+                    <li>• <strong>Constancias:</strong> acempresariales@uss.edu.pe</li>
+                    <li>• <strong>Cursos:</strong> Word, Excel, SPSS/Project (S/200 c/u)</li>
+                    <li>• <strong>Pagos:</strong> Yape, BCP, Tarjeta</li>
+                    <li>• <strong>Contacto:</strong> centrodeinformatica@uss.edu.pe</li>
+                  </ul>
+                </div>
+              </div>
+              
+              <div className="mt-8 p-4 rounded-lg" style={{ backgroundColor: COLORS.celeste + '20' }}>
+                <h4 className="font-bold mb-2" style={{ color: COLORS.morado }}>📋 Información importante</h4>
+                <p className="text-sm text-gray-700">
+                  Este chatbot está diseñado específicamente para el <strong>Programa de Computación para Egresados USS</strong>. 
+                  Para otros trámites académicos, contacta directamente con las áreas correspondientes.
+                </p>
+              </div>
             </div>
-            <div className="flex-1">
-              <h1 className="text-lg font-bold" style={{ color: darkMode ? COLORS.blanco : COLORS.grisOscuro }}>
-                Centro de Informática USS
-              </h1>
-              <p className="text-sm font-medium" style={{ color: COLORS.celeste }}>En línea</p>
-            </div>
-            <button onClick={toggleDarkMode} className="p-2">
-              {darkMode ? (
-                <Sun className="w-5 h-5" style={{ color: COLORS.celeste }} />
-              ) : (
-                <Moon className="w-5 h-5" style={{ color: COLORS.morado }} />
-              )}
-            </button>
           </div>
-        </div>
+        )}
+        
+        {/* Chat principal */}
+        <div className="flex-1 flex flex-col relative"
+          style={{ backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco }}>
+          
+          {/* Header con botón para mostrar/ocultar guía */}
+          <div className={`p-4 border-b flex justify-between items-center ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}
+            style={{ backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco }}>
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center"
+                  style={{ backgroundColor: COLORS.verde }}>
+                  <Bot className="w-7 h-7" style={{ color: COLORS.morado }} />
+                </div>
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2"
+                  style={{ backgroundColor: COLORS.celeste, borderColor: COLORS.blanco }}></div>
+              </div>
+              <div className="flex-1">
+                <h1 className="text-lg font-bold" style={{ color: darkMode ? COLORS.blanco : COLORS.grisOscuro }}>
+                  Centro de Informática USS
+                </h1>
+                <p className="text-sm font-medium" style={{ color: COLORS.celeste }}>En línea</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {/* Botón para mostrar/ocultar guía */}
+              <button 
+                onClick={togglePdfGuide}
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                title="Ver guía de uso"
+              >
+                <FileText className="w-5 h-5" style={{ color: COLORS.morado }} />
+              </button>
+              
+              <button onClick={toggleDarkMode} className="p-2">
+                {darkMode ? (
+                  <Sun className="w-5 h-5" style={{ color: COLORS.celeste }} />
+                ) : (
+                  <Moon className="w-5 h-5" style={{ color: COLORS.morado }} />
+                )}
+              </button>
+            </div>
+          </div>
 
-        {/* Messages */}
-        <div className={`flex-1 overflow-y-auto p-4 space-y-4 ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}
-          style={{ backgroundColor: darkMode ? '#1a1a1a' : COLORS.grisClaro }}>
-          {messages.map((message, index) => (
-            <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-              {message.type === 'bot' && (
-                <div className="flex items-start gap-3 max-w-[85%]">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+          {/* Messages */}
+          <div className={`flex-1 overflow-y-auto p-4 space-y-4 ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}
+            style={{ backgroundColor: darkMode ? '#1a1a1a' : COLORS.grisClaro }}>
+            {messages.map((message, index) => (
+              <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                {message.type === 'bot' && (
+                  <div className="flex items-start gap-3 max-w-[85%]">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: COLORS.verde }}>
+                      <Bot className="w-6 h-6" style={{ color: COLORS.morado }} />
+                    </div>
+                    <div>
+                      <div className="rounded-2xl p-4 shadow-md"
+                        style={{ 
+                          backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco,
+                          color: darkMode ? COLORS.grisClaro : COLORS.grisOscuro,
+                          borderLeft: `4px solid ${COLORS.celeste}`
+                        }}>
+                        <div 
+                          className="text-sm leading-relaxed"
+                          dangerouslySetInnerHTML={{ __html: formatMessage(message.text) }}
+                        />
+                      </div>
+                      
+                      {/* Botones de respuesta rápida */}
+                      {message.buttons && message.buttons.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          {message.buttons.map((button, btnIndex) => (
+                            <button
+                              key={btnIndex}
+                              onClick={() => handleButtonClick(button.value, button.text)}
+                              className="px-4 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105 shadow-md hover:shadow-lg"
+                              style={{ 
+                                backgroundColor: COLORS.celeste,
+                                color: COLORS.blanco,
+                                border: `1px solid ${COLORS.verde}`
+                              }}
+                              onMouseEnter={(e) => {
+                                e.target.style.backgroundColor = COLORS.celesteHover;
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.backgroundColor = COLORS.celeste;
+                              }}
+                            >
+                              {button.text}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {message.type === 'user' && (
+                  <div className="flex items-start gap-3 max-w-[85%] flex-row-reverse">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: COLORS.verde }}>
+                      <User className="w-6 h-6" style={{ color: COLORS.morado }} />
+                    </div>
+                    <div className="rounded-2xl p-4 text-sm shadow-md"
+                      style={{ 
+                        backgroundColor: COLORS.morado,
+                        color: COLORS.blanco,
+                        borderRight: `4px solid ${COLORS.celeste}`
+                      }}>
+                      {message.text}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+            
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center animate-pulse"
                     style={{ backgroundColor: COLORS.verde }}>
                     <Bot className="w-6 h-6" style={{ color: COLORS.morado }} />
                   </div>
-                  <div>
-                    <div className="rounded-2xl p-4 shadow-md"
-                      style={{ 
-                        backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco,
-                        color: darkMode ? COLORS.grisClaro : COLORS.grisOscuro,
-                        borderLeft: `4px solid ${COLORS.celeste}`
-                      }}>
-                      <div 
-                        className="text-sm leading-relaxed"
-                        dangerouslySetInnerHTML={{ __html: formatMessage(message.text) }}
-                      />
-                    </div>
-                    
-                    {/* Botones de respuesta rápida */}
-                    {message.buttons && message.buttons.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        {message.buttons.map((button, btnIndex) => (
-                          <button
-                            key={btnIndex}
-                            onClick={() => handleButtonClick(button.value, button.text)}
-                            className="px-4 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105 shadow-md hover:shadow-lg"
-                            style={{ 
-                              backgroundColor: COLORS.celeste,
-                              color: COLORS.blanco,
-                              border: `1px solid ${COLORS.verde}`
-                            }}
-                            onMouseEnter={(e) => {
-                              e.target.style.backgroundColor = COLORS.celesteHover;
-                            }}
-                            onMouseLeave={(e) => {
-                              e.target.style.backgroundColor = COLORS.celeste;
-                            }}
-                          >
-                            {button.text}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-              
-              {message.type === 'user' && (
-                <div className="flex items-start gap-3 max-w-[85%] flex-row-reverse">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center"
-                    style={{ backgroundColor: COLORS.verde }}>
-                    <User className="w-6 h-6" style={{ color: COLORS.morado }} />
-                  </div>
-                  <div className="rounded-2xl p-4 text-sm shadow-md"
+                  <div className="rounded-2xl p-4 shadow-md"
                     style={{ 
-                      backgroundColor: COLORS.morado,
-                      color: COLORS.blanco,
-                      borderRight: `4px solid ${COLORS.celeste}`
+                      backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco,
+                      borderLeft: `4px solid ${COLORS.celeste}`
                     }}>
-                    {message.text}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-          
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center animate-pulse"
-                  style={{ backgroundColor: COLORS.verde }}>
-                  <Bot className="w-6 h-6" style={{ color: COLORS.morado }} />
-                </div>
-                <div className="rounded-2xl p-4 shadow-md"
-                  style={{ 
-                    backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco,
-                    borderLeft: `4px solid ${COLORS.celeste}`
-                  }}>
-                  <div className="flex gap-2">
-                    <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: COLORS.morado }}></div>
-                    <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: COLORS.morado, animationDelay: '0.2s' }}></div>
-                    <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: COLORS.morado, animationDelay: '0.4s' }}></div>
+                    <div className="flex gap-2">
+                      <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: COLORS.morado }}></div>
+                      <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: COLORS.morado, animationDelay: '0.2s' }}></div>
+                      <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: COLORS.morado, animationDelay: '0.4s' }}></div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-          
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Input */}
-        <div className="border-t p-4"
-          style={{ 
-            backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco,
-            borderColor: darkMode ? '#444' : '#e5e7eb'
-          }}>
-          <div className="flex items-end gap-3">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              disabled={isLoading}
-              rows={1}
-              placeholder="Escribe aquí..."
-              className="flex-1 rounded-2xl px-4 py-3 focus:outline-none resize-none"
-              style={{ 
-                backgroundColor: darkMode ? '#2a2a2a' : COLORS.grisClaro,
-                color: darkMode ? COLORS.grisClaro : COLORS.grisOscuro,
-                border: `2px solid ${COLORS.verde}`,
-                boxShadow: `0 0 0 1px ${COLORS.verde}40, inset 0 2px 4px 0 rgba(0,0,0,0.05)`
-              }}
-            />
-            
-            {input.trim() && (
-              <button
-                onClick={() => handleSend()}
-                disabled={isLoading}
-                className="p-3 rounded-full hover:scale-105 transition-all shadow-md"
-                style={{ 
-                  backgroundColor: COLORS.celeste,
-                  color: COLORS.blanco
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = COLORS.celesteHover;
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = COLORS.celeste;
-                }}
-              >
-                <Send className="w-5 h-5" />
-              </button>
             )}
             
-            <button 
-              onClick={toggleVoiceRecognition}
-              className="p-3 rounded-full hover:scale-105 transition-all shadow-md"
-              style={{ 
-                backgroundColor: COLORS.verde,
-                border: isListening ? `2px solid ${COLORS.celeste}` : 'none'
-              }}
-            >
-              <Mic className="w-5 h-5" style={{ color: COLORS.morado }} />
-            </button>
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input */}
+          <div className="border-t p-4"
+            style={{ 
+              backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco,
+              borderColor: darkMode ? '#444' : '#e5e7eb'
+            }}>
+            <div className="flex items-end gap-3">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                disabled={isLoading}
+                rows={1}
+                placeholder="Escribe aquí tu consulta (ej: 'constancias', 'cursos', 'pagos')..."
+                className="flex-1 rounded-2xl px-4 py-3 focus:outline-none resize-none"
+                style={{ 
+                  backgroundColor: darkMode ? '#2a2a2a' : COLORS.grisClaro,
+                  color: darkMode ? COLORS.grisClaro : COLORS.grisOscuro,
+                  border: `2px solid ${COLORS.verde}`,
+                  boxShadow: `0 0 0 1px ${COLORS.verde}40, inset 0 2px 4px 0 rgba(0,0,0,0.05)`
+                }}
+              />
+              
+              {input.trim() && (
+                <button
+                  onClick={() => handleSend()}
+                  disabled={isLoading}
+                  className="p-3 rounded-full hover:scale-105 transition-all shadow-md"
+                  style={{ 
+                    backgroundColor: COLORS.celeste,
+                    color: COLORS.blanco
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = COLORS.celesteHover;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = COLORS.celeste;
+                  }}
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              )}
+              
+              <button 
+                onClick={toggleVoiceRecognition}
+                className="p-3 rounded-full hover:scale-105 transition-all shadow-md"
+                style={{ 
+                  backgroundColor: COLORS.verde,
+                  border: isListening ? `2px solid ${COLORS.celeste}` : 'none'
+                }}
+              >
+                <Mic className="w-5 h-5" style={{ color: COLORS.morado }} />
+              </button>
+            </div>
+            
+            {/* Sugerencias rápidas */}
+            <div className="flex flex-wrap gap-2 mt-3">
+              <button
+                onClick={() => handleSend('constancias')}
+                className="px-3 py-1.5 text-xs rounded-full transition-all hover:scale-105"
+                style={{ 
+                  backgroundColor: 'rgba(90, 34, 144, 0.1)',
+                  color: COLORS.morado,
+                  border: `1px solid ${COLORS.morado}40`
+                }}
+              >
+                📋 Constancias
+              </button>
+              <button
+                onClick={() => handleSend('cursos disponibles')}
+                className="px-3 py-1.5 text-xs rounded-full transition-all hover:scale-105"
+                style={{ 
+                  backgroundColor: 'rgba(17, 172, 211, 0.1)',
+                  color: COLORS.celeste,
+                  border: `1px solid ${COLORS.celeste}40`
+                }}
+              >
+                📚 Cursos
+              </button>
+              <button
+                onClick={() => handleSend('métodos de pago')}
+                className="px-3 py-1.5 text-xs rounded-full transition-all hover:scale-105"
+                style={{ 
+                  backgroundColor: 'rgba(99, 237, 18, 0.1)',
+                  color: COLORS.verde,
+                  border: `1px solid ${COLORS.verde}40`
+                }}
+              >
+                💳 Pagos
+              </button>
+              <button
+                onClick={() => handleSend('contactos')}
+                className="px-3 py-1.5 text-xs rounded-full transition-all hover:scale-105"
+                style={{ 
+                  backgroundColor: 'rgba(90, 34, 144, 0.1)',
+                  color: COLORS.morado,
+                  border: `1px solid ${COLORS.morado}40`
+                }}
+              >
+                📞 Contactos
+              </button>
+            </div>
           </div>
         </div>
       </div>
