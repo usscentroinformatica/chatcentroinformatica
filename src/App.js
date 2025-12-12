@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Moon, Sun, Mic, FileText, X, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Send, Bot, User, Moon, Sun, Mic, FileText, X } from 'lucide-react';
 
 function App() {
   const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
   const [showSplash, setShowSplash] = useState(true);
-  const [showPdfGuide, setShowPdfGuide] = useState(false);
+  const [showPdfGuide, setShowPdfGuide] = useState(true); // Visible por defecto
   const [messages, setMessages] = useState([
     { 
       type: 'bot', 
@@ -18,7 +18,7 @@ function App() {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(false); // Tema claro por defecto
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState(null);
   const [currentStep, setCurrentStep] = useState('elegibilidad');
@@ -240,7 +240,9 @@ Contacta a paccis@uss.edu.pe para orientación
     if (savedTheme === 'true') {
       setDarkMode(true);
     }
+  }, []);
 
+  useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const recognitionInstance = new SpeechRecognition();
@@ -721,7 +723,7 @@ Contacta a paccis@uss.edu.pe para orientación
   return (
     <div className="min-h-screen h-screen w-full fixed inset-0" style={{ backgroundColor: COLORS.morado }}>
       <div className="flex h-full w-full md:max-w-6xl md:mx-auto relative z-10 md:my-4 md:rounded-2xl md:h-[calc(100vh-2rem)] overflow-hidden shadow-2xl">
-        {/* Panel lateral del PDF - Oculto por defecto, se muestra con botón */}
+        {/* Panel lateral del PDF - Visible por defecto en desktop */}
         {showPdfGuide && (
           <div className="hidden md:flex flex-col w-96 bg-white shadow-xl z-20">
             <div className="p-4 border-b flex justify-between items-center" style={{ backgroundColor: COLORS.morado }}>
@@ -820,13 +822,15 @@ Contacta a paccis@uss.edu.pe para orientación
             </div>
             
             <div className="flex items-center gap-2">
-              {/* Botón para mostrar/ocultar guía */}
+              {/* Botón para mostrar/ocultar guía - Color cambia según tema */}
               <button 
                 onClick={togglePdfGuide}
                 className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                title="Ver guía de uso"
+                title={showPdfGuide ? "Ocultar guía" : "Mostrar guía"}
               >
-                <FileText className="w-5 h-5" style={{ color: COLORS.morado }} />
+                <FileText className="w-5 h-5" style={{ 
+                  color: darkMode ? COLORS.celeste : COLORS.morado 
+                }} />
               </button>
               
               <button onClick={toggleDarkMode} className="p-2">
@@ -936,7 +940,7 @@ Contacta a paccis@uss.edu.pe para orientación
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input */}
+          {/* Input - SIN SUGERENCIAS RÁPIDAS */}
           <div className="border-t p-4"
             style={{ 
               backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco,
@@ -949,7 +953,7 @@ Contacta a paccis@uss.edu.pe para orientación
                 onKeyPress={handleKeyPress}
                 disabled={isLoading}
                 rows={1}
-                placeholder="Escribe aquí tu consulta (ej: 'constancias', 'cursos', 'pagos')..."
+                placeholder="Escribe aquí tu consulta..."
                 className="flex-1 rounded-2xl px-4 py-3 focus:outline-none resize-none"
                 style={{ 
                   backgroundColor: darkMode ? '#2a2a2a' : COLORS.grisClaro,
@@ -988,54 +992,6 @@ Contacta a paccis@uss.edu.pe para orientación
                 }}
               >
                 <Mic className="w-5 h-5" style={{ color: COLORS.morado }} />
-              </button>
-            </div>
-            
-            {/* Sugerencias rápidas */}
-            <div className="flex flex-wrap gap-2 mt-3">
-              <button
-                onClick={() => handleSend('constancias')}
-                className="px-3 py-1.5 text-xs rounded-full transition-all hover:scale-105"
-                style={{ 
-                  backgroundColor: 'rgba(90, 34, 144, 0.1)',
-                  color: COLORS.morado,
-                  border: `1px solid ${COLORS.morado}40`
-                }}
-              >
-                📋 Constancias
-              </button>
-              <button
-                onClick={() => handleSend('cursos disponibles')}
-                className="px-3 py-1.5 text-xs rounded-full transition-all hover:scale-105"
-                style={{ 
-                  backgroundColor: 'rgba(17, 172, 211, 0.1)',
-                  color: COLORS.celeste,
-                  border: `1px solid ${COLORS.celeste}40`
-                }}
-              >
-                📚 Cursos
-              </button>
-              <button
-                onClick={() => handleSend('métodos de pago')}
-                className="px-3 py-1.5 text-xs rounded-full transition-all hover:scale-105"
-                style={{ 
-                  backgroundColor: 'rgba(99, 237, 18, 0.1)',
-                  color: COLORS.verde,
-                  border: `1px solid ${COLORS.verde}40`
-                }}
-              >
-                💳 Pagos
-              </button>
-              <button
-                onClick={() => handleSend('contactos')}
-                className="px-3 py-1.5 text-xs rounded-full transition-all hover:scale-105"
-                style={{ 
-                  backgroundColor: 'rgba(90, 34, 144, 0.1)',
-                  color: COLORS.morado,
-                  border: `1px solid ${COLORS.morado}40`
-                }}
-              >
-                📞 Contactos
               </button>
             </div>
           </div>
