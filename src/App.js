@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Moon, Sun, Mic, FileText, X, Menu, XCircle } from 'lucide-react';
+import { Send, Bot, User, Moon, Sun, Mic, FileText, X, Menu } from 'lucide-react';
 
 function App() {
   const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
@@ -825,7 +825,7 @@ Contacta a paccis@uss.edu.pe para orientación
             style={{ backgroundColor: darkMode ? COLORS.grisOscuro : COLORS.blanco }}>
             <div className="flex items-center gap-2 sm:gap-3">
               <button
-                onClick={toggleMobileMenu}
+                onClick={togglePdfGuide}
                 className="md:hidden p-2"
               >
                 <Menu className="w-5 h-5" style={{ color: darkMode ? COLORS.grisClaro : COLORS.grisOscuro }} />
@@ -858,24 +858,44 @@ Contacta a paccis@uss.edu.pe para orientación
                 }} />
               </button>
               
-              {/* Botón de guía con texto en desktop */}
+              {/* Botón de guía con texto en desktop - CORREGIDO */}
               <button 
                 onClick={togglePdfGuide}
-                className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg transition-colors"
+                style={{ 
+                  backgroundColor: 'transparent',
+                  color: darkMode ? COLORS.grisClaro : COLORS.grisOscuro
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = darkMode ? '#4a5568' : '#f3f4f6';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                }}
                 title={showPdfGuide ? "Ocultar guía" : "Mostrar guía"}
               >
                 <FileText className="w-4 h-4" style={{ 
                   color: darkMode ? COLORS.celeste : COLORS.morado 
                 }} />
-                <span className="text-sm font-medium" style={{ color: darkMode ? COLORS.grisClaro : COLORS.grisOscuro }}>
+                <span className="text-sm font-medium">
                   {showPdfGuide ? "Ocultar guía" : "Mostrar guía"}
                 </span>
               </button>
               
-              {/* Botón de tema con texto en desktop */}
+              {/* Botón de tema con texto en desktop - CORREGIDO */}
               <button 
                 onClick={toggleDarkMode}
-                className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg transition-colors"
+                style={{ 
+                  backgroundColor: 'transparent',
+                  color: darkMode ? COLORS.grisClaro : COLORS.grisOscuro
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = darkMode ? '#4a5568' : '#f3f4f6';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                }}
                 title={darkMode ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
               >
                 {darkMode ? (
@@ -883,7 +903,7 @@ Contacta a paccis@uss.edu.pe para orientación
                 ) : (
                   <Moon className="w-4 h-4" style={{ color: COLORS.morado }} />
                 )}
-                <span className="text-sm font-medium" style={{ color: darkMode ? COLORS.grisClaro : COLORS.grisOscuro }}>
+                <span className="text-sm font-medium">
                   {darkMode ? "Modo claro" : "Modo oscuro"}
                 </span>
               </button>
